@@ -33,6 +33,16 @@ export interface TimedScoreElement {
   scoreQuarter: number;
 }
 
+export interface TimedRainSymbol {
+  id: string;
+  elements: SVGGraphicsElement[];
+  ownerElement: SVGGraphicsElement;
+  scoreQuarter: number;
+  staffIndex: number;
+  x: number;
+  y: number;
+}
+
 export interface TimedScoreSpan {
   element: SVGGraphicsElement;
   startQuarter: number;
@@ -47,6 +57,7 @@ export interface TimedTieContinuation {
 
 export interface ScoreRenderResult {
   targets: ScoreTarget[];
+  restSymbols: TimedRainSymbol[];
   revealElements: TimedScoreElement[];
   growingSpans: TimedScoreSpan[];
   tieContinuations: TimedTieContinuation[];
@@ -73,7 +84,7 @@ export class ScoreRenderer {
     });
   }
 
-  async render(musicXml: string, measuresPerSystem = 4): Promise<ScoreRenderResult> {
+  async render(musicXml: string, measuresPerSystem = 4, _requestedScoreScale?: number): Promise<ScoreRenderResult> {
     const laidOutXml = applyMeasuresPerSystem(musicXml, measuresPerSystem);
     this.osmd.clear();
     await this.osmd.load(laidOutXml);
@@ -94,10 +105,10 @@ export class ScoreRenderer {
     if (this.matchMeasureWidthsToFirstSystem()) {
       this.osmd.render();
     }
-    const targets = this.collectTargets();
+    const { targets, restSymbols } = this.collectTargets();
     const { revealElements, growingSpans } = this.collectTimedScoreElements(targets);
     const tieContinuations = this.collectTieContinuations(targets);
-    return { targets, revealElements, growingSpans, tieContinuations };
+    return { targets, restSymbols, revealElements, growingSpans, tieContinuations };
   }
 
   private matchMeasureWidthsToFirstSystem(): boolean {
@@ -130,8 +141,9 @@ export class ScoreRenderer {
     return changed;
   }
 
-  private collectTargets(): ScoreTarget[] {
+  private collectTargets(): Pick<ScoreRenderResult, "targets" | "restSymbols"> {
     const targets: ScoreTarget[] = [];
+    const restSymbols = new Map<string, TimedRainSymbol>();
     const containers = this.osmd.GraphicSheet.VerticalGraphicalStaffEntryContainers;
     const hostBounds = this.container.getBoundingClientRect();
 
@@ -141,12 +153,35 @@ export class ScoreRenderer {
         if (!staffEntry) return;
         for (const voiceEntry of staffEntry.graphicalVoiceEntries) {
           for (const note of voiceEntry.notes) {
-            if (!note.sourceNote.Pitch || note.sourceNote.isRest()) continue;
             const point = this.osmd.GraphicSheet.svgToDom(note.PositionAndShape.AbsolutePosition);
             const svgNote = note as unknown as SvgBackedGraphicalNote;
             const notehead = this.findNotehead(svgNote, point, hostBounds);
             const stem = this.findStem(svgNote, hostBounds);
             const notation = this.findNotation(svgNote);
+            if (note.sourceNote.isRest()) {
+              // Only hide a rest once its complete SVG representation has
+              // been registered for RainLayer. OSMD omits some sparse-staff
+              // rests from this graph; those must remain visible on the score.
+              if (!notation) continue;
+              const elements = [...new Set([notation.noteElement, ...notation.attachedElements])];
+              const bounds = notation.noteElement.getBoundingClientRect();
+              if (elements.length === 0 || bounds.width <= 0 || bounds.height <= 0) continue;
+              const key = `${staffIndex}:${scoreQuarter.toFixed(6)}:${notation.noteElement.id}`;
+              if (!restSymbols.has(key)) {
+                restSymbols.set(key, {
+                  id: `rest-${restSymbols.size}`,
+                  elements,
+                  ownerElement: notation.noteElement,
+                  scoreQuarter,
+                  staffIndex,
+                  x: bounds.left - hostBounds.left + bounds.width / 2,
+                  y: bounds.top - hostBounds.top + bounds.height / 2,
+                });
+                elements.forEach((element) => element.style.setProperty("visibility", "hidden"));
+              }
+              continue;
+            }
+            if (!note.sourceNote.Pitch) continue;
             const tie = note.sourceNote.NoteTie;
             targets.push({
               id: `score-${targets.length}`,
@@ -171,7 +206,7 @@ export class ScoreRenderer {
 
     this.attachBeams(targets, hostBounds);
 
-    return targets;
+    return { targets, restSymbols: [...restSymbols.values()] };
   }
 
   private findNotation(note: SvgBackedGraphicalNote): ScoreNotation | undefined {
