@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatDuration } from "./lib/format";
 import { MidiTimeline, parseMidi, type MidiSummary } from "./lib/midi";
 import { extractMusicXml, summarizeMusicXml, type ScoreSummary } from "./lib/mxl";
+import { RainLayer } from "./lib/rain-layer";
 import { ScoreRenderer } from "./lib/score-renderer";
 import { MediaTransport, type TransportSnapshot } from "./lib/transport";
 
@@ -58,6 +59,7 @@ export default function App() {
   const scoreHostRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const transportRef = useRef<MediaTransport | null>(null);
+  const rainLayerRef = useRef<RainLayer | null>(null);
 
   const adoptProject = useCallback((nextProject: LoadedProject) => {
     setProject((previous) => {
@@ -102,6 +104,8 @@ export default function App() {
     const host = scoreHostRef.current;
     if (!host || !project) return;
     let cancelled = false;
+    rainLayerRef.current?.dispose();
+    rainLayerRef.current = null;
     host.replaceChildren();
     setTargetCount(0);
     setStatus("正在排版 SVG 五线谱…");
@@ -110,6 +114,10 @@ export default function App() {
       .render(project.musicXml, measuresPerSystem)
       .then((targets) => {
         if (cancelled) return;
+        const rainLayer = new RainLayer(host);
+        rainLayer.setEvents(project.midi.events, targets);
+        rainLayer.update(snapshot.sourceTimeMs);
+        rainLayerRef.current = rainLayer;
         setTargetCount(targets.length);
         setStatus("谱面、MIDI 与音频已就绪");
       })
@@ -118,8 +126,14 @@ export default function App() {
       });
     return () => {
       cancelled = true;
+      rainLayerRef.current?.dispose();
+      rainLayerRef.current = null;
     };
   }, [project, measuresPerSystem]);
+
+  useEffect(() => {
+    rainLayerRef.current?.update(snapshot.sourceTimeMs);
+  }, [snapshot.sourceTimeMs]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -186,8 +200,7 @@ export default function App() {
     <main className="app-shell">
       <header className="hero">
         <div>
-          <p className="eyebrow">LOCAL-FIRST SCORE ANIMATION</p>
-          <h1>Melody<span>Rain</span></h1>
+          <h1>Melody Rain</h1>
           <p className="subtitle">MusicXML 乐谱、MIDI 时间轴与音乐，由同一个 Transport 驱动。</p>
         </div>
         <div className={`status-pill ${error ? "is-error" : ""}`}>
