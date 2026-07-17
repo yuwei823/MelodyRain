@@ -4,7 +4,8 @@ import { MidiTimeline, parseMidi, type MidiSummary } from "./lib/midi";
 import { extractMusicXml, summarizeMusicXml, type ScoreSummary } from "./lib/mxl";
 import { RainLayer } from "./lib/rain-layer";
 import { ScoreRenderer } from "./lib/score-renderer";
-import { MediaTransport, type TransportSnapshot } from "./lib/transport";
+import { ScoreTimelineLayer } from "./lib/score-timeline-layer";
+import { MediaTransport, TRANSPORT_PRE_ROLL_MS, type TransportSnapshot } from "./lib/transport";
 
 interface DemoManifest {
   title: string;
@@ -22,8 +23,8 @@ interface LoadedProject {
 
 const EMPTY_SNAPSHOT: TransportSnapshot = {
   state: "idle",
-  presentationTimeMs: 0,
-  sourceTimeMs: 0,
+  presentationTimeMs: -TRANSPORT_PRE_ROLL_MS - 1,
+  sourceTimeMs: -TRANSPORT_PRE_ROLL_MS - 1,
   durationMs: 0,
   scoreQuarter: 0,
   tempoScale: 1,
@@ -60,6 +61,7 @@ export default function App() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const transportRef = useRef<MediaTransport | null>(null);
   const rainLayerRef = useRef<RainLayer | null>(null);
+  const scoreTimelineLayerRef = useRef<ScoreTimelineLayer | null>(null);
 
   const adoptProject = useCallback((nextProject: LoadedProject) => {
     setProject((previous) => {
@@ -106,18 +108,25 @@ export default function App() {
     let cancelled = false;
     rainLayerRef.current?.dispose();
     rainLayerRef.current = null;
+    scoreTimelineLayerRef.current?.dispose();
+    scoreTimelineLayerRef.current = null;
     host.replaceChildren();
     setTargetCount(0);
     setStatus("正在排版 SVG 五线谱…");
     const renderer = new ScoreRenderer(host);
     void renderer
       .render(project.musicXml, measuresPerSystem)
-      .then((targets) => {
+      .then(({ targets, revealElements, growingSpans, tieContinuations }) => {
         if (cancelled) return;
         const rainLayer = new RainLayer(host);
         rainLayer.setEvents(project.midi.events, targets);
-        rainLayer.update(snapshot.sourceTimeMs);
+        const currentTimeMs = transportRef.current?.snapshot().sourceTimeMs ?? -TRANSPORT_PRE_ROLL_MS - 1;
+        rainLayer.update(currentTimeMs);
         rainLayerRef.current = rainLayer;
+        const scoreTimelineLayer = new ScoreTimelineLayer(new MidiTimeline(project.midi));
+        scoreTimelineLayer.setElements(revealElements, growingSpans, tieContinuations);
+        scoreTimelineLayer.update(currentTimeMs);
+        scoreTimelineLayerRef.current = scoreTimelineLayer;
         setTargetCount(targets.length);
         setStatus("谱面、MIDI 与音频已就绪");
       })
@@ -128,11 +137,14 @@ export default function App() {
       cancelled = true;
       rainLayerRef.current?.dispose();
       rainLayerRef.current = null;
+      scoreTimelineLayerRef.current?.dispose();
+      scoreTimelineLayerRef.current = null;
     };
   }, [project, measuresPerSystem]);
 
   useEffect(() => {
     rainLayerRef.current?.update(snapshot.sourceTimeMs);
+    scoreTimelineLayerRef.current?.update(snapshot.sourceTimeMs);
   }, [snapshot.sourceTimeMs]);
 
   useEffect(() => {

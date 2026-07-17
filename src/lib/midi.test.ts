@@ -31,6 +31,7 @@ describe("MIDI timeline", () => {
     const active = timeline.activeNotesAt(first.attackMs + Math.min(10, first.durationMs / 2));
     expect(active.some((note) => note.id === first.id)).toBe(true);
     expect(timeline.scoreQuarterAt(first.attackMs)).toBeCloseTo(first.scoreQuarter, 2);
+    expect(timeline.timeAtScoreQuarter(first.scoreQuarter)).toBeCloseTo(first.attackMs, -1);
   });
 
   it("rejects data without an MThd signature", () => {

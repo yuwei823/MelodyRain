@@ -90,6 +90,16 @@ export class MidiTimeline {
     return tempo.scoreQuarter + ((timeMs - tempo.timeMs) * tempo.bpm) / 60_000;
   }
 
+  timeAtScoreQuarter(scoreQuarter: number): number {
+    let selected = this.summary.tempoMap[0];
+    for (const tempo of this.summary.tempoMap) {
+      if (tempo.scoreQuarter > scoreQuarter) break;
+      selected = tempo;
+    }
+    const tempo = selected ?? { ticks: 0, scoreQuarter: 0, timeMs: 0, bpm: 120 };
+    return tempo.timeMs + ((scoreQuarter - tempo.scoreQuarter) * 60_000) / tempo.bpm;
+  }
+
   activeNotesAt(timeMs: number): MidiNoteEvent[] {
     return this.summary.events.filter((event) => event.attackMs <= timeMs && event.releaseMs > timeMs);
   }

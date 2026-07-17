@@ -11,9 +11,7 @@ export interface RainChord {
 
 interface RenderedChord {
   chord: RainChord;
-  element: HTMLDivElement;
-  anchorX: number;
-  anchorY: number;
+  elements: SVGGraphicsElement[];
 }
 
 const FALL_DURATION_MS = 1_200;
@@ -49,7 +47,9 @@ export function mapRainChords(events: MidiNoteEvent[], targets: ScoreTarget[]): 
     if (!target) continue;
     used.add(target.id);
 
-    const key = `${target.staffIndex}:${target.scoreQuarter.toFixed(6)}:${Math.round(target.x * 2)}`;
+    const notationId = target.notation?.noteElement.id;
+    const positionId = notationId || `${target.scoreQuarter.toFixed(6)}:${Math.round(target.x * 2)}`;
+    const key = `${target.staffIndex}:${positionId}`;
     const existing = groups.get(key);
     if (existing) {
       existing.events.push(event);
@@ -70,93 +70,106 @@ export function mapRainChords(events: MidiNoteEvent[], targets: ScoreTarget[]): 
   return [...groups.values()].sort((left, right) => left.attackMs - right.attackMs);
 }
 
+function mergeBeamedChords(chords: RainChord[]): RainChord[] {
+  const parents = chords.map((_, index) => index);
+  const firstChordForBeam = new Map<SVGGraphicsElement, number>();
+
+  const find = (index: number): number => {
+    while (parents[index]! !== index) {
+      parents[index] = parents[parents[index]!]!;
+      index = parents[index]!;
+    }
+    return index;
+  };
+  const union = (left: number, right: number): void => {
+    const leftRoot = find(left);
+    const rightRoot = find(right);
+    if (leftRoot !== rightRoot) parents[rightRoot] = leftRoot;
+  };
+
+  chords.forEach((chord, chordIndex) => {
+    const beams = new Set(chord.targets.flatMap((target) => target.notation?.beamElements ?? []));
+    beams.forEach((beam) => {
+      const firstIndex = firstChordForBeam.get(beam);
+      if (firstIndex === undefined) firstChordForBeam.set(beam, chordIndex);
+      else union(firstIndex, chordIndex);
+    });
+  });
+
+  const merged = new Map<number, RainChord>();
+  chords.forEach((chord, index) => {
+    const root = find(index);
+    const existing = merged.get(root);
+    if (!existing) {
+      merged.set(root, { ...chord, events: [...chord.events], targets: [...chord.targets] });
+      return;
+    }
+    existing.events.push(...chord.events);
+    existing.targets.push(...chord.targets);
+    existing.attackMs = Math.min(existing.attackMs, chord.attackMs);
+    existing.releaseMs = Math.max(existing.releaseMs, chord.releaseMs);
+  });
+
+  return [...merged.values()].sort((left, right) => left.attackMs - right.attackMs);
+}
+
 export class RainLayer {
-  private readonly layer: HTMLDivElement;
   private chords: RenderedChord[] = [];
 
-  constructor(private readonly container: HTMLElement) {
-    this.layer = document.createElement("div");
-    this.layer.className = "rain-layer";
-    this.layer.setAttribute("aria-hidden", "true");
-    this.container.append(this.layer);
-  }
+  constructor(_container: HTMLElement) {}
 
   setEvents(events: MidiNoteEvent[], targets: ScoreTarget[]): number {
-    this.layer.replaceChildren();
-    this.chords = mapRainChords(events, targets).map((chord) => this.renderChord(chord));
+    this.clearRenderedElements();
+    this.chords = mergeBeamedChords(mapRainChords(events, targets)).map((chord) => this.renderChord(chord));
     return this.chords.length;
   }
 
   update(timeMs: number): void {
-    for (const rendered of this.chords) {
-      const { chord, element, anchorX, anchorY } = rendered;
+    for (const { chord, elements } of this.chords) {
       const startMs = chord.attackMs - FALL_DURATION_MS;
-      if (timeMs < startMs) {
-        element.hidden = true;
-        continue;
-      }
-
-      element.hidden = false;
+      const isVisible = timeMs >= startMs;
       const rawProgress = Math.max(0, Math.min(1, (timeMs - startMs) / FALL_DURATION_MS));
-      const progress = easeInCubic(rawProgress);
-      const fallOffset = -FALL_DISTANCE_PX * (1 - progress);
-      const rotation = -14 * (1 - progress);
-      const scale = 0.9 + progress * 0.1;
-      const hitPulse = timeMs >= chord.attackMs && timeMs < chord.attackMs + 260;
+      const fallOffset = -FALL_DISTANCE_PX * (1 - easeInCubic(rawProgress));
+      const isHit = timeMs >= chord.attackMs && timeMs < chord.attackMs + 260;
+      const isLanded = timeMs >= chord.attackMs;
 
-      element.classList.toggle("is-hit", hitPulse);
-      element.classList.toggle("is-landed", timeMs >= chord.attackMs);
-      element.style.transform =
-        `translate3d(${anchorX}px, ${anchorY + fallOffset}px, 0) rotate(${rotation}deg) scale(${scale})`;
+      elements.forEach((element) => {
+        element.style.visibility = isVisible ? "visible" : "hidden";
+        element.style.transform = `translateY(${fallOffset}px)`;
+        element.classList.toggle("is-hit", isHit);
+        element.classList.toggle("is-landed", isLanded);
+      });
     }
   }
 
   dispose(): void {
+    this.clearRenderedElements();
     this.chords = [];
-    this.layer.remove();
   }
 
   private renderChord(chord: RainChord): RenderedChord {
-    const minX = Math.min(...chord.targets.map((target) => target.x - target.width / 2));
-    const maxX = Math.max(...chord.targets.map((target) => target.x + target.width / 2));
-    const minY = Math.min(...chord.targets.map((target) => target.y - target.height / 2));
-    const maxY = Math.max(...chord.targets.map((target) => target.y + target.height / 2));
-    const anchorX = (minX + maxX) / 2;
-    const anchorY = (minY + maxY) / 2;
-    const element = document.createElement("div");
-    element.className = `rain-chord staff-${(chord.targets[0]?.staffIndex ?? 0) % 2 === 0 ? "treble" : "bass"}`;
-    element.title = chord.events.map((event) => event.name).join(" + ");
-    element.hidden = true;
-
-    const stems = new Map<string, NonNullable<ScoreTarget["stem"]>>();
+    const elements = new Set<SVGGraphicsElement>();
     chord.targets.forEach((target) => {
-      if (!target.stem) return;
-      const key = [target.stem.x, target.stem.y, target.stem.width, target.stem.height]
-        .map((value) => Math.round(value * 2))
-        .join(":");
-      stems.set(key, target.stem);
-    });
-    stems.forEach((stem) => {
-      const elementStem = document.createElement("span");
-      elementStem.className = "rain-stem";
-      elementStem.style.left = `${stem.x - anchorX - Math.max(1.25, stem.width) / 2}px`;
-      elementStem.style.top = `${stem.y - anchorY - stem.height / 2}px`;
-      elementStem.style.width = `${Math.max(1.25, stem.width)}px`;
-      elementStem.style.height = `${stem.height}px`;
-      element.append(elementStem);
+      if (!target.notation) return;
+      elements.add(target.notation.noteElement);
+      target.notation.attachedElements.forEach((element) => elements.add(element));
+      target.notation.beamElements.forEach((element) => elements.add(element));
     });
 
-    chord.targets.forEach((target) => {
-      const head = document.createElement("span");
-      head.className = "rain-notehead";
-      head.style.left = `${target.x - anchorX - target.width / 2}px`;
-      head.style.top = `${target.y - anchorY - target.height / 2}px`;
-      head.style.width = `${Math.max(8, target.width)}px`;
-      head.style.height = `${Math.max(6, target.height)}px`;
-      element.append(head);
+    const staffClass = (chord.targets[0]?.staffIndex ?? 0) % 2 === 0 ? "staff-treble" : "staff-bass";
+    elements.forEach((element) => {
+      element.classList.add("rain-score-symbol", staffClass);
+      element.style.visibility = "hidden";
     });
 
-    this.layer.append(element);
-    return { chord, element, anchorX, anchorY };
+    return { chord, elements: [...elements] };
+  }
+
+  private clearRenderedElements(): void {
+    this.chords.flatMap((rendered) => rendered.elements).forEach((element) => {
+      element.classList.remove("rain-score-symbol", "staff-treble", "staff-bass", "is-hit", "is-landed");
+      element.style.removeProperty("transform");
+      element.style.removeProperty("visibility");
+    });
   }
 }

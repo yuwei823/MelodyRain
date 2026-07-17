@@ -11,6 +11,8 @@ export interface ScoreTarget {
   width: number;
   height: number;
   stem?: ScoreSymbolBounds;
+  notation?: ScoreNotation;
+  tieContinuation?: boolean;
 }
 
 export interface ScoreSymbolBounds {
@@ -20,9 +22,41 @@ export interface ScoreSymbolBounds {
   height: number;
 }
 
+export interface ScoreNotation {
+  noteElement: SVGGraphicsElement;
+  attachedElements: SVGGraphicsElement[];
+  beamElements: SVGGraphicsElement[];
+}
+
+export interface TimedScoreElement {
+  element: SVGGraphicsElement;
+  scoreQuarter: number;
+}
+
+export interface TimedScoreSpan {
+  element: SVGGraphicsElement;
+  startQuarter: number;
+  endQuarter: number;
+}
+
+export interface TimedTieContinuation {
+  elements: SVGGraphicsElement[];
+  scoreQuarter: number;
+  staffIndex: number;
+}
+
+export interface ScoreRenderResult {
+  targets: ScoreTarget[];
+  revealElements: TimedScoreElement[];
+  growingSpans: TimedScoreSpan[];
+  tieContinuations: TimedTieContinuation[];
+}
+
 interface SvgBackedGraphicalNote {
   getNoteheadSVGs(): HTMLElement[];
   getStemSVG(): HTMLElement;
+  getVFNoteSVG(): HTMLElement;
+  getLedgerLineSVGs(): HTMLElement[];
 }
 
 export class ScoreRenderer {
@@ -39,7 +73,7 @@ export class ScoreRenderer {
     });
   }
 
-  async render(musicXml: string, measuresPerSystem = 4): Promise<ScoreTarget[]> {
+  async render(musicXml: string, measuresPerSystem = 4): Promise<ScoreRenderResult> {
     const laidOutXml = applyMeasuresPerSystem(musicXml, measuresPerSystem);
     this.osmd.clear();
     await this.osmd.load(laidOutXml);
@@ -60,7 +94,10 @@ export class ScoreRenderer {
     if (this.matchMeasureWidthsToFirstSystem()) {
       this.osmd.render();
     }
-    return this.collectTargets();
+    const targets = this.collectTargets();
+    const { revealElements, growingSpans } = this.collectTimedScoreElements(targets);
+    const tieContinuations = this.collectTieContinuations(targets);
+    return { targets, revealElements, growingSpans, tieContinuations };
   }
 
   private matchMeasureWidthsToFirstSystem(): boolean {
@@ -109,6 +146,8 @@ export class ScoreRenderer {
             const svgNote = note as unknown as SvgBackedGraphicalNote;
             const notehead = this.findNotehead(svgNote, point, hostBounds);
             const stem = this.findStem(svgNote, hostBounds);
+            const notation = this.findNotation(svgNote);
+            const tie = note.sourceNote.NoteTie;
             targets.push({
               id: `score-${targets.length}`,
               scoreQuarter,
@@ -120,15 +159,199 @@ export class ScoreRenderer {
               width: notehead?.width ?? 12,
               height: notehead?.height ?? 8,
               stem: stem?.bounds,
+              notation,
+              tieContinuation: Boolean(tie && tie.Notes.indexOf(note.sourceNote) > 0),
             });
-            notehead?.element.style.setProperty("visibility", "hidden");
-            stem?.element.style.setProperty("visibility", "hidden");
+            notation?.noteElement.style.setProperty("visibility", "hidden");
+            notation?.attachedElements.forEach((element) => element.style.setProperty("visibility", "hidden"));
           }
         }
       });
     }
 
+    this.attachBeams(targets, hostBounds);
+
     return targets;
+  }
+
+  private findNotation(note: SvgBackedGraphicalNote): ScoreNotation | undefined {
+    if (typeof note.getVFNoteSVG !== "function") return undefined;
+
+    try {
+      const vfNoteElement = note.getVFNoteSVG() as unknown as SVGGraphicsElement | undefined;
+      if (!vfNoteElement) return undefined;
+      // VexFlow keeps dots, accidentals and articulations in the sibling
+      // `.vf-modifiers` group, so animate the complete stave-note wrapper.
+      const noteElement = (vfNoteElement.closest(".vf-stavenote") ?? vfNoteElement) as SVGGraphicsElement;
+      const attachedElements = typeof note.getLedgerLineSVGs === "function"
+        ? note.getLedgerLineSVGs().filter(Boolean) as unknown as SVGGraphicsElement[]
+        : [];
+      const siblingLedgerGroup = noteElement.parentElement?.querySelector<SVGGraphicsElement>(
+        `[id="${noteElement.id}ledgers"]`,
+      );
+      if (siblingLedgerGroup && !attachedElements.includes(siblingLedgerGroup)) {
+        attachedElements.push(siblingLedgerGroup);
+      }
+      // Beamed stems are rendered as siblings of `.vf-stavenote`, unlike regular
+      // stems which are children of it. Bring those external stem groups along.
+      if (typeof note.getStemSVG === "function") {
+        const stemPath = note.getStemSVG() as unknown as SVGGraphicsElement | undefined;
+        const stemGroup = stemPath?.parentElement?.matches("g.vf-stem")
+          ? stemPath.parentElement as unknown as SVGGraphicsElement
+          : stemPath;
+        if (stemGroup && !noteElement.contains(stemGroup)) attachedElements.push(stemGroup);
+      }
+      return { noteElement, attachedElements, beamElements: [] };
+    } catch {
+      return undefined;
+    }
+  }
+
+  private attachBeams(targets: ScoreTarget[], hostBounds: DOMRect): void {
+    const beams = [...this.container.querySelectorAll<SVGGraphicsElement>(".vf-beam")];
+
+    for (const beam of beams) {
+      const beamBounds = beam.getBoundingClientRect();
+      const beamLeft = beamBounds.left - hostBounds.left;
+      const beamRight = beamBounds.right - hostBounds.left;
+      const beamTop = beamBounds.top - hostBounds.top;
+      const beamBottom = beamBounds.bottom - hostBounds.top;
+
+      const connected = targets.filter((target) => {
+        if (!target.stem || !target.notation) return false;
+        const stemLeft = target.stem.x - target.stem.width / 2;
+        const stemRight = target.stem.x + target.stem.width / 2;
+        const stemTop = target.stem.y - target.stem.height / 2;
+        const stemBottom = target.stem.y + target.stem.height / 2;
+        const overlapsX = stemRight >= beamLeft - 3 && stemLeft <= beamRight + 3;
+        const touchesY = beamBottom >= stemTop - 4 && beamTop <= stemBottom + 4;
+        return overlapsX && touchesY;
+      });
+
+      if (connected.length < 2) continue;
+      beam.style.setProperty("visibility", "hidden");
+      connected.forEach((target) => target.notation?.beamElements.push(beam));
+    }
+  }
+
+  private collectTimedScoreElements(
+    targets: ScoreTarget[],
+  ): Pick<ScoreRenderResult, "revealElements" | "growingSpans"> {
+    const growingSpanSelector = [
+      ".vf-stavetie",
+      ".vf-staveslur",
+      '[class*="gliss"]',
+      '[class*="slide"]',
+      '[class*="wavy"]',
+      '[class*="hammer"]',
+      '[class*="pull-off"]',
+      '[class*="bend"]',
+    ].join(",");
+    const revealSelector = [
+      ".vf-stavetempo",
+      ".vf-text",
+      ".vf-line",
+      '[class*="pedal"]',
+      '[class*="octave"]',
+      '[class*="volta"]',
+      '[class*="rehearsal"]',
+      '[class*="lyric"]',
+      '[class*="chord-symbol"]',
+      '[class*="coda"]',
+      '[class*="segno"]',
+      '[class*="breath"]',
+      '[class*="caesura"]',
+    ].join(",");
+    const spanElements = [...this.container.querySelectorAll<SVGGraphicsElement>(growingSpanSelector)]
+      .filter((element) => !element.closest(".vf-stavenote"))
+      .filter((element, index, all) => !all.some((candidate, candidateIndex) =>
+        candidateIndex !== index && candidate.contains(element),
+      ));
+    const spanSet = new Set(spanElements);
+    const revealElements = [...this.container.querySelectorAll<SVGGraphicsElement>(revealSelector)]
+      .filter((element) => !element.closest(".vf-stavenote") && !spanSet.has(element))
+      .filter((element, index, all) => !all.some((candidate, candidateIndex) =>
+        candidateIndex !== index && candidate.contains(element),
+      ));
+
+    const reveals = revealElements.flatMap((element) => {
+      const candidates = this.targetsForElement(element, targets, "system");
+      if (candidates.length === 0) return [];
+      const elementLeft = element.getBoundingClientRect().left - this.container.getBoundingClientRect().left;
+      const target = this.nearestTargetAtX(candidates, elementLeft);
+      if (!target) return [];
+      element.style.setProperty("visibility", "hidden");
+      element.style.setProperty("opacity", "0");
+      return [{ element, scoreQuarter: target.scoreQuarter }];
+    });
+
+    const spans = spanElements.flatMap((element) => {
+      const candidates = this.targetsForElement(element, targets);
+      if (candidates.length === 0) return [];
+      const bounds = element.getBoundingClientRect();
+      const hostLeft = this.container.getBoundingClientRect().left;
+      const start = this.nearestTargetAtX(candidates, bounds.left - hostLeft);
+      const end = this.nearestTargetAtX(candidates, bounds.right - hostLeft);
+      if (!start) return [];
+      element.style.setProperty("visibility", "hidden");
+      element.style.setProperty("opacity", "0");
+      const endQuarter = end && end.scoreQuarter > start.scoreQuarter
+        ? end.scoreQuarter
+        : start.scoreQuarter + Math.max(0.25, this.nextTargetQuarter(candidates, start.scoreQuarter));
+      return [{ element, startQuarter: start.scoreQuarter, endQuarter }];
+    });
+
+    return { revealElements: reveals, growingSpans: spans };
+  }
+
+  private collectTieContinuations(targets: ScoreTarget[]): TimedTieContinuation[] {
+    const groups = new Map<string, TimedTieContinuation>();
+
+    targets.filter((target) => target.tieContinuation && target.notation).forEach((target) => {
+      const notation = target.notation!;
+      const key = `${target.staffIndex}:${target.scoreQuarter.toFixed(6)}:${notation.noteElement.id}`;
+      const elements = [notation.noteElement, ...notation.attachedElements, ...notation.beamElements];
+      const existing = groups.get(key);
+      if (existing) {
+        elements.forEach((element) => {
+          if (!existing.elements.includes(element)) existing.elements.push(element);
+        });
+      } else {
+        groups.set(key, {
+          elements: [...new Set(elements)],
+          scoreQuarter: target.scoreQuarter,
+          staffIndex: target.staffIndex,
+        });
+      }
+    });
+
+    return [...groups.values()].sort((left, right) => left.scoreQuarter - right.scoreQuarter);
+  }
+
+  private targetsForElement(
+    element: SVGGraphicsElement,
+    targets: ScoreTarget[],
+    scope: "measure" | "system" = "measure",
+  ): ScoreTarget[] {
+    const selector = scope === "system" ? ".staffline" : ".vf-measure";
+    const owner = element.closest(selector);
+    if (!owner) return targets;
+    return targets.filter((target) => target.notation?.noteElement.closest(selector) === owner);
+  }
+
+  private nearestTargetAtX(targets: ScoreTarget[], x: number): ScoreTarget | undefined {
+    return targets.reduce<ScoreTarget | undefined>((nearest, target) => {
+      if (!nearest) return target;
+      return Math.abs(target.x - x) < Math.abs(nearest.x - x) ? target : nearest;
+    }, undefined);
+  }
+
+  private nextTargetQuarter(targets: ScoreTarget[], startQuarter: number): number {
+    const next = targets
+      .map((target) => target.scoreQuarter)
+      .filter((quarter) => quarter > startQuarter)
+      .sort((left, right) => left - right)[0];
+    return next === undefined ? 1 : next - startQuarter;
   }
 
   private findNotehead(
