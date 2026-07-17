@@ -1,5 +1,6 @@
 import { OpenSheetMusicDisplay } from "opensheetmusicdisplay";
 import { applyMeasuresPerSystem } from "./score-layout";
+import { removePedalMarkings } from "./score-sanitizer";
 
 export interface ScoreTarget {
   id: string;
@@ -33,6 +34,16 @@ export interface TimedScoreElement {
   scoreQuarter: number;
 }
 
+export interface TimedRainSymbol {
+  id: string;
+  elements: SVGGraphicsElement[];
+  ownerElement: SVGGraphicsElement;
+  scoreQuarter: number;
+  staffIndex: number;
+  x: number;
+  y: number;
+}
+
 export interface TimedScoreSpan {
   element: SVGGraphicsElement;
   startQuarter: number;
@@ -47,6 +58,7 @@ export interface TimedTieContinuation {
 
 export interface ScoreRenderResult {
   targets: ScoreTarget[];
+  restSymbols: TimedRainSymbol[];
   revealElements: TimedScoreElement[];
   growingSpans: TimedScoreSpan[];
   tieContinuations: TimedTieContinuation[];
@@ -57,6 +69,12 @@ interface SvgBackedGraphicalNote {
   getStemSVG(): HTMLElement;
   getVFNoteSVG(): HTMLElement;
   getLedgerLineSVGs(): HTMLElement[];
+}
+
+interface ScoreTimingAnchor {
+  scoreQuarter: number;
+  x: number;
+  ownerElement: SVGGraphicsElement;
 }
 
 export class ScoreRenderer {
@@ -73,8 +91,8 @@ export class ScoreRenderer {
     });
   }
 
-  async render(musicXml: string, measuresPerSystem = 4): Promise<ScoreRenderResult> {
-    const laidOutXml = applyMeasuresPerSystem(musicXml, measuresPerSystem);
+  async render(musicXml: string, measuresPerSystem = 3, scoreScale = 2 / 3): Promise<ScoreRenderResult> {
+    const laidOutXml = applyMeasuresPerSystem(removePedalMarkings(musicXml), measuresPerSystem);
     this.osmd.clear();
     await this.osmd.load(laidOutXml);
     const availableWidth = Math.max(320, this.container.clientWidth);
@@ -83,21 +101,33 @@ export class ScoreRenderer {
     // Keep a measured safety factor so the requested number does not wrap before the XML system break.
     const equalMeasureWidth = Math.max(
       7,
-      (availableWidth / 10 / measuresPerSystem - reservedWidthInOsmdUnits / measuresPerSystem) * 0.72,
+      (availableWidth / 10 / scoreScale / measuresPerSystem - reservedWidthInOsmdUnits / measuresPerSystem) * 0.72,
     );
     this.osmd.EngravingRules.FixedMeasureWidth = true;
     this.osmd.EngravingRules.FixedMeasureWidthFixedValue = equalMeasureWidth;
     this.osmd.EngravingRules.FixedMeasureWidthUseForPickupMeasures = true;
     this.osmd.EngravingRules.RenderXMeasuresPerLineAkaSystem = measuresPerSystem;
-    this.osmd.Zoom = 1;
+    this.osmd.Zoom = scoreScale;
     this.osmd.render();
     if (this.matchMeasureWidthsToFirstSystem()) {
       this.osmd.render();
     }
-    const targets = this.collectTargets();
-    const { revealElements, growingSpans } = this.collectTimedScoreElements(targets);
+    const { targets, restSymbols } = this.collectTargets();
+    const timingAnchors: ScoreTimingAnchor[] = [
+      ...targets.flatMap((target) => target.notation ? [{
+        scoreQuarter: target.scoreQuarter,
+        x: target.x,
+        ownerElement: target.notation.noteElement,
+      }] : []),
+      ...restSymbols.map((rest) => ({
+        scoreQuarter: rest.scoreQuarter,
+        x: rest.x,
+        ownerElement: rest.ownerElement,
+      })),
+    ];
+    const { revealElements, growingSpans } = this.collectTimedScoreElements(timingAnchors);
     const tieContinuations = this.collectTieContinuations(targets);
-    return { targets, revealElements, growingSpans, tieContinuations };
+    return { targets, restSymbols, revealElements, growingSpans, tieContinuations };
   }
 
   private matchMeasureWidthsToFirstSystem(): boolean {
@@ -130,8 +160,9 @@ export class ScoreRenderer {
     return changed;
   }
 
-  private collectTargets(): ScoreTarget[] {
+  private collectTargets(): Pick<ScoreRenderResult, "targets" | "restSymbols"> {
     const targets: ScoreTarget[] = [];
+    const restSymbols = new Map<string, TimedRainSymbol>();
     const containers = this.osmd.GraphicSheet.VerticalGraphicalStaffEntryContainers;
     const hostBounds = this.container.getBoundingClientRect();
 
@@ -141,19 +172,39 @@ export class ScoreRenderer {
         if (!staffEntry) return;
         for (const voiceEntry of staffEntry.graphicalVoiceEntries) {
           for (const note of voiceEntry.notes) {
-            if (!note.sourceNote.Pitch || note.sourceNote.isRest()) continue;
             const point = this.osmd.GraphicSheet.svgToDom(note.PositionAndShape.AbsolutePosition);
             const svgNote = note as unknown as SvgBackedGraphicalNote;
             const notehead = this.findNotehead(svgNote, point, hostBounds);
             const stem = this.findStem(svgNote, hostBounds);
             const notation = this.findNotation(svgNote);
+            const visualStaffIndex = this.staffIndexForNotation(notation?.noteElement, staffIndex);
+            if (note.sourceNote.isRest()) {
+              if (!notation) continue;
+              const elements = [notation.noteElement, ...notation.attachedElements];
+              const key = `${visualStaffIndex}:${scoreQuarter.toFixed(6)}:${notation.noteElement.id}`;
+              if (!restSymbols.has(key)) {
+                const bounds = notation.noteElement.getBoundingClientRect();
+                elements.forEach((element) => element.style.setProperty("visibility", "hidden"));
+                restSymbols.set(key, {
+                  id: `rest-${restSymbols.size}`,
+                  elements: [...new Set(elements)],
+                  ownerElement: notation.noteElement,
+                  scoreQuarter,
+                  staffIndex: visualStaffIndex,
+                  x: bounds.left - hostBounds.left + bounds.width / 2,
+                  y: bounds.top - hostBounds.top + bounds.height / 2,
+                });
+              }
+              continue;
+            }
+            if (!note.sourceNote.Pitch) continue;
             const tie = note.sourceNote.NoteTie;
             targets.push({
               id: `score-${targets.length}`,
               scoreQuarter,
               // OSMD numbers C4 as 48, while MIDI numbers C4 as 60.
               pitchMidi: note.sourceNote.Pitch.getHalfTone() + 12,
-              staffIndex,
+              staffIndex: visualStaffIndex,
               x: notehead?.x ?? point.x,
               y: notehead?.y ?? point.y,
               width: notehead?.width ?? 12,
@@ -170,8 +221,51 @@ export class ScoreRenderer {
     }
 
     this.attachBeams(targets, hostBounds);
+    this.attachDetachedNoteModifiers(targets, hostBounds);
+    this.collectUntrackedSvgNotes(targets, hostBounds);
 
-    return targets;
+    return { targets, restSymbols: [...restSymbols.values()] };
+  }
+
+  /**
+   * Some MusicXML files render additional staff notes in VexFlow without
+   * exposing them through OSMD's VerticalGraphicalStaffEntryContainers. This
+   * is especially common for sparse lower piano staves. Discover those SVG
+   * notes after rendering and give them the nearest same-measure score time.
+   */
+  private collectUntrackedSvgNotes(targets: ScoreTarget[], hostBounds: DOMRect): void {
+    const tracked = new Set(targets.flatMap((target) => target.notation ? [target.notation.noteElement] : []));
+    const untracked = [...this.container.querySelectorAll<SVGGraphicsElement>(".vf-stavenote")]
+      .filter((element) => !tracked.has(element));
+
+    untracked.forEach((noteElement) => {
+      const bounds = noteElement.getBoundingClientRect();
+      if (bounds.width <= 0 || bounds.height <= 0) return;
+      const measureId = noteElement.closest(".vf-measure")?.id;
+      const x = bounds.left - hostBounds.left + bounds.width / 2;
+      const sameMeasure = targets.filter((target) =>
+        target.notation?.noteElement.closest(".vf-measure")?.id === measureId,
+      );
+      const timingSource = this.nearestTargetAtX(sameMeasure.length > 0 ? sameMeasure : targets, x);
+      if (!timingSource) return;
+
+      const staffIndex = this.staffIndexForNotation(noteElement, timingSource.staffIndex);
+      const notation: ScoreNotation = { noteElement, attachedElements: [], beamElements: [] };
+      targets.push({
+        id: `svg-fallback-${targets.length}`,
+        scoreQuarter: timingSource.scoreQuarter,
+        // No reliable OSMD pitch is available for this fallback; RainLayer will
+        // schedule it from score time instead of attempting a MIDI match.
+        pitchMidi: -1,
+        staffIndex,
+        x,
+        y: bounds.top - hostBounds.top + bounds.height / 2,
+        width: bounds.width,
+        height: bounds.height,
+        notation,
+      });
+      noteElement.style.setProperty("visibility", "hidden");
+    });
   }
 
   private findNotation(note: SvgBackedGraphicalNote): ScoreNotation | undefined {
@@ -207,6 +301,19 @@ export class ScoreRenderer {
     }
   }
 
+  /**
+   * OSMD's VerticalGraphicalStaffEntryContainers can report index 0 for
+   * multiple rendered staves. The SVG staffline id is the rendered source of
+   * truth (`…-1`, `…-2`, etc.), so use it whenever available.
+   */
+  private staffIndexForNotation(noteElement: SVGGraphicsElement | undefined, fallback: number): number {
+    const staffId = noteElement?.closest(".staffline")?.id;
+    const match = staffId?.match(/-(\d+)$/);
+    if (!match) return fallback;
+    const index = Number(match[1]) - 1;
+    return Number.isSafeInteger(index) && index >= 0 ? index : fallback;
+  }
+
   private attachBeams(targets: ScoreTarget[], hostBounds: DOMRect): void {
     const beams = [...this.container.querySelectorAll<SVGGraphicsElement>(".vf-beam")];
 
@@ -234,8 +341,35 @@ export class ScoreRenderer {
     }
   }
 
+  private attachDetachedNoteModifiers(targets: ScoreTarget[], hostBounds: DOMRect): void {
+    const selector = [
+      ".vf-tremolo",
+      ".vf-stroke",
+      ".vf-ornament",
+      '[class*="tremolo"]',
+    ].join(",");
+    const modifiers = [...this.container.querySelectorAll<SVGGraphicsElement>(selector)]
+      .filter((element, index, all) => !all.some((candidate, candidateIndex) =>
+        candidateIndex !== index && candidate.contains(element),
+      ));
+
+    modifiers.forEach((element) => {
+      if (targets.some((target) => target.notation?.noteElement.contains(element))) return;
+      const bounds = element.getBoundingClientRect();
+      const centerX = bounds.left - hostBounds.left + bounds.width / 2;
+      const ownerMeasure = element.closest(".vf-measure");
+      const candidates = targets.filter((target) =>
+        target.notation && (!ownerMeasure || target.notation.noteElement.closest(".vf-measure") === ownerMeasure),
+      );
+      const target = this.nearestTargetAtX(candidates, centerX);
+      if (!target?.notation || Math.abs(target.x - centerX) > Math.max(18, target.width * 3)) return;
+      if (!target.notation.attachedElements.includes(element)) target.notation.attachedElements.push(element);
+      element.style.setProperty("visibility", "hidden");
+    });
+  }
+
   private collectTimedScoreElements(
-    targets: ScoreTarget[],
+    targets: ScoreTimingAnchor[],
   ): Pick<ScoreRenderResult, "revealElements" | "growingSpans"> {
     const growingSpanSelector = [
       ".vf-stavetie",
@@ -330,23 +464,23 @@ export class ScoreRenderer {
 
   private targetsForElement(
     element: SVGGraphicsElement,
-    targets: ScoreTarget[],
+    targets: ScoreTimingAnchor[],
     scope: "measure" | "system" = "measure",
-  ): ScoreTarget[] {
+  ): ScoreTimingAnchor[] {
     const selector = scope === "system" ? ".staffline" : ".vf-measure";
     const owner = element.closest(selector);
     if (!owner) return targets;
-    return targets.filter((target) => target.notation?.noteElement.closest(selector) === owner);
+    return targets.filter((target) => target.ownerElement.closest(selector) === owner);
   }
 
-  private nearestTargetAtX(targets: ScoreTarget[], x: number): ScoreTarget | undefined {
-    return targets.reduce<ScoreTarget | undefined>((nearest, target) => {
+  private nearestTargetAtX<T extends { x: number }>(targets: T[], x: number): T | undefined {
+    return targets.reduce<T | undefined>((nearest, target) => {
       if (!nearest) return target;
       return Math.abs(target.x - x) < Math.abs(nearest.x - x) ? target : nearest;
     }, undefined);
   }
 
-  private nextTargetQuarter(targets: ScoreTarget[], startQuarter: number): number {
+  private nextTargetQuarter(targets: ScoreTimingAnchor[], startQuarter: number): number {
     const next = targets
       .map((target) => target.scoreQuarter)
       .filter((quarter) => quarter > startQuarter)

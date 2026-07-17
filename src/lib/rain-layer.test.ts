@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MidiNoteEvent } from "./midi";
-import { mapRainChords } from "./rain-layer";
+import { fallbackRainChords, mapRainChords } from "./rain-layer";
 import type { ScoreTarget } from "./score-renderer";
 
 function event(id: string, midi: number, scoreQuarter: number, attackMs: number): MidiNoteEvent {
@@ -51,5 +51,35 @@ describe("rain chord mapping", () => {
     );
 
     expect(chords).toHaveLength(0);
+  });
+
+  it("schedules an unmatched written bass note from the score tempo map", () => {
+    const bassTarget = target("bass", 43, 4, 1, 100, 120);
+    bassTarget.notation = {
+      noteElement: { id: "bass-note" } as unknown as SVGGraphicsElement,
+      attachedElements: [],
+      beamElements: [],
+    };
+
+    const chords = fallbackRainChords([bassTarget], new Set(), (quarter) => quarter * 500);
+
+    expect(chords).toHaveLength(1);
+    expect(chords[0]?.attackMs).toBe(2_000);
+    expect(chords[0]?.targets).toEqual([bassTarget]);
+  });
+
+  it("also schedules a tied continuation when MIDI has no new note-on", () => {
+    const tiedBassTarget = target("tied-bass", 43, 6, 1, 140, 120);
+    tiedBassTarget.tieContinuation = true;
+    tiedBassTarget.notation = {
+      noteElement: { id: "tied-bass-note" } as unknown as SVGGraphicsElement,
+      attachedElements: [],
+      beamElements: [],
+    };
+
+    const chords = fallbackRainChords([tiedBassTarget], new Set(), (quarter) => quarter * 500);
+
+    expect(chords).toHaveLength(1);
+    expect(chords[0]?.attackMs).toBe(3_000);
   });
 });

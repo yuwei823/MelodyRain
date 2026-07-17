@@ -1,16 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatDuration } from "./lib/format";
+import { assetRelativePath, matchProjectFolderAssets } from "./lib/asset-folder";
+import {
+  canReadFolder,
+  canRememberFolder,
+  chooseAssetFolder,
+  filesInFolder,
+  lastRememberedAssetFolder,
+  rememberAssetFolder,
+} from "./lib/remembered-folder";
 import { MidiTimeline, parseMidi, type MidiSummary } from "./lib/midi";
 import { extractMusicXml, summarizeMusicXml, type ScoreSummary } from "./lib/mxl";
 import { RainLayer } from "./lib/rain-layer";
+import { PORTRAIT_ASPECT_RATIO, PORTRAIT_RENDER_PROFILE } from "./lib/render-profile";
 import { ScoreRenderer } from "./lib/score-renderer";
+import { ScoreCamera } from "./lib/score-camera";
 import { ScoreTimelineLayer } from "./lib/score-timeline-layer";
 import { MediaTransport, TRANSPORT_PRE_ROLL_MS, type TransportSnapshot } from "./lib/transport";
-
-interface DemoManifest {
-  title: string;
-  assets: { score: string; midi: string; audio: string };
-}
 
 interface LoadedProject {
   label: string;
@@ -33,12 +39,6 @@ const EMPTY_SNAPSHOT: TransportSnapshot = {
   activeNoteIds: [],
 };
 
-async function fetchBuffer(url: string): Promise<ArrayBuffer> {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`资源读取失败：${response.status} ${response.statusText}`);
-  return response.arrayBuffer();
-}
-
 async function readScoreFile(file: File): Promise<string> {
   return file.name.toLowerCase().endsWith(".mxl") ? extractMusicXml(await file.arrayBuffer()) : file.text();
 }
@@ -50,57 +50,33 @@ function stateLabel(state: TransportSnapshot["state"]): string {
 export default function App() {
   const [project, setProject] = useState<LoadedProject | null>(null);
   const [snapshot, setSnapshot] = useState(EMPTY_SNAPSHOT);
-  const [status, setStatus] = useState("正在连接本地服务…");
+  const [status, setStatus] = useState("请选择素材文件夹");
   const [error, setError] = useState<string | null>(null);
   const [targetCount, setTargetCount] = useState(0);
   const [scoreFile, setScoreFile] = useState<File | null>(null);
   const [midiFile, setMidiFile] = useState<File | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
-  const [measuresPerSystem, setMeasuresPerSystem] = useState(4);
+  const [folderName, setFolderName] = useState<string | null>(null);
+  const [customTitle, setCustomTitle] = useState("");
+  const [measuresPerSystem, setMeasuresPerSystem] = useState(PORTRAIT_RENDER_PROFILE.measuresPerSystem);
   const scoreHostRef = useRef<HTMLDivElement>(null);
+  const scoreViewportRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const transportRef = useRef<MediaTransport | null>(null);
   const rainLayerRef = useRef<RainLayer | null>(null);
   const scoreTimelineLayerRef = useRef<ScoreTimelineLayer | null>(null);
+  const scoreCameraRef = useRef<ScoreCamera | null>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
 
   const adoptProject = useCallback((nextProject: LoadedProject) => {
     setProject((previous) => {
       if (previous?.revokeAudioUrl) URL.revokeObjectURL(previous.audioUrl);
       return nextProject;
     });
+    setCustomTitle("");
     setSnapshot(EMPTY_SNAPSHOT);
     setError(null);
   }, []);
-
-  const loadDemo = useCallback(async () => {
-    setStatus("正在加载《欢乐颂》示例素材…");
-    setError(null);
-    try {
-      const manifestResponse = await fetch("/api/demo/manifest");
-      if (!manifestResponse.ok) throw new Error("本地服务未返回示例清单");
-      const manifest = (await manifestResponse.json()) as DemoManifest;
-      const [mxlBuffer, midiBuffer] = await Promise.all([
-        fetchBuffer(manifest.assets.score),
-        fetchBuffer(manifest.assets.midi),
-      ]);
-      const musicXml = extractMusicXml(mxlBuffer);
-      adoptProject({
-        label: manifest.title,
-        musicXml,
-        score: summarizeMusicXml(musicXml),
-        midi: parseMidi(midiBuffer),
-        audioUrl: manifest.assets.audio,
-      });
-      setStatus("示例素材已加载");
-    } catch (caught) {
-      setStatus("加载失败");
-      setError(caught instanceof Error ? caught.message : String(caught));
-    }
-  }, [adoptProject]);
-
-  useEffect(() => {
-    void loadDemo();
-  }, [loadDemo]);
 
   useEffect(() => {
     const host = scoreHostRef.current;
@@ -110,23 +86,38 @@ export default function App() {
     rainLayerRef.current = null;
     scoreTimelineLayerRef.current?.dispose();
     scoreTimelineLayerRef.current = null;
+    scoreCameraRef.current?.dispose();
+    scoreCameraRef.current = null;
     host.replaceChildren();
     setTargetCount(0);
     setStatus("正在排版 SVG 五线谱…");
     const renderer = new ScoreRenderer(host);
     void renderer
-      .render(project.musicXml, measuresPerSystem)
-      .then(({ targets, revealElements, growingSpans, tieContinuations }) => {
+      .render(project.musicXml, measuresPerSystem, PORTRAIT_RENDER_PROFILE.scoreScale)
+      .then(({ targets, restSymbols, revealElements, growingSpans }) => {
         if (cancelled) return;
-        const rainLayer = new RainLayer(host);
-        rainLayer.setEvents(project.midi.events, targets);
+        const timeline = new MidiTimeline(project.midi);
+        const rainLayer = new RainLayer(host, timeline);
+        rainLayer.setEvents(project.midi.events, targets, restSymbols);
         const currentTimeMs = transportRef.current?.snapshot().sourceTimeMs ?? -TRANSPORT_PRE_ROLL_MS - 1;
         rainLayer.update(currentTimeMs);
         rainLayerRef.current = rainLayer;
-        const scoreTimelineLayer = new ScoreTimelineLayer(new MidiTimeline(project.midi));
-        scoreTimelineLayer.setElements(revealElements, growingSpans, tieContinuations);
+        const scoreTimelineLayer = new ScoreTimelineLayer(timeline);
+        // Tie curves are growing spans; their continuation noteheads stay in
+        // the rain layer, avoiding two layers competing to hide the same SVG.
+        scoreTimelineLayer.setElements(revealElements, growingSpans);
         scoreTimelineLayer.update(currentTimeMs);
         scoreTimelineLayerRef.current = scoreTimelineLayer;
+        const viewport = scoreViewportRef.current;
+        if (viewport) {
+          const scoreCamera = new ScoreCamera(viewport, host);
+          scoreCamera.setAnchors([
+            ...targets.map((target) => ({ scoreQuarter: target.scoreQuarter, x: target.x, y: target.y })),
+            ...restSymbols.map((rest) => ({ scoreQuarter: rest.scoreQuarter, x: rest.x, y: rest.y })),
+          ]);
+          scoreCamera.update(timeline.scoreQuarterAt(currentTimeMs));
+          scoreCameraRef.current = scoreCamera;
+        }
         setTargetCount(targets.length);
         setStatus("谱面、MIDI 与音频已就绪");
       })
@@ -139,13 +130,16 @@ export default function App() {
       rainLayerRef.current = null;
       scoreTimelineLayerRef.current?.dispose();
       scoreTimelineLayerRef.current = null;
+      scoreCameraRef.current?.dispose();
+      scoreCameraRef.current = null;
     };
   }, [project, measuresPerSystem]);
 
   useEffect(() => {
     rainLayerRef.current?.update(snapshot.sourceTimeMs);
     scoreTimelineLayerRef.current?.update(snapshot.sourceTimeMs);
-  }, [snapshot.sourceTimeMs]);
+    scoreCameraRef.current?.update(snapshot.scoreQuarter);
+  }, [snapshot.scoreQuarter, snapshot.sourceTimeMs]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -176,21 +170,86 @@ export default function App() {
     return project.midi.events.filter((event) => active.has(event.id));
   }, [project, snapshot.activeNoteIds]);
 
-  const loadLocalFiles = async () => {
-    if (!scoreFile || !midiFile || !audioFile) {
-      setError("请选择 MXL/MusicXML、MIDI 和 MP3 三个文件");
+  const loadRememberedFolder = async () => {
+    try {
+      const handle = await lastRememberedAssetFolder();
+      if (!handle) return;
+      setFolderName(handle.name);
+      if (!await canReadFolder(handle)) {
+        setStatus(`已记住“${handle.name}”，请重新选择以授权读取。`);
+        return;
+      }
+      setStatus(`正在重新读取“${handle.name}”…`);
+      selectAssetFolderFromFiles(await filesInFolder(handle));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    }
+  };
+
+  useEffect(() => {
+    if (canRememberFolder()) void loadRememberedFolder();
+  }, []);
+
+  const selectAssetFolderFromFiles = (files: File[]) => {
+    setScoreFile(null);
+    setMidiFile(null);
+    setAudioFile(null);
+    if (files.length === 0) {
+      setStatus("尚未选择素材文件夹");
+      return;
+    }
+    try {
+      const matched = matchProjectFolderAssets(files);
+      setScoreFile(matched.score);
+      setMidiFile(matched.midi);
+      setAudioFile(matched.audio);
+      setError(null);
+      void loadLocalFiles(matched);
+    } catch (caught) {
+      setStatus("素材匹配失败");
+      setError(caught instanceof Error ? caught.message : String(caught));
+    }
+  };
+
+  const selectAssetFolder = (files: FileList | null) => {
+    setFolderName(files?.[0]?.webkitRelativePath.split("/")[0] ?? null);
+    selectAssetFolderFromFiles(files ? [...files] : []);
+  };
+
+  const chooseAndLoadAssetFolder = async () => {
+    if (!canRememberFolder()) {
+      folderInputRef.current?.click();
+      return;
+    }
+    try {
+      const handle = await chooseAssetFolder();
+      await rememberAssetFolder(handle);
+      setFolderName(handle.name);
+      selectAssetFolderFromFiles(await filesInFolder(handle));
+    } catch (caught) {
+      if (caught instanceof DOMException && caught.name === "AbortError") return;
+      setError(caught instanceof Error ? caught.message : String(caught));
+    }
+  };
+
+  const loadLocalFiles = async (matchedAssets?: { score: File; midi: File; audio: File }) => {
+    const assets = matchedAssets ?? (scoreFile && midiFile && audioFile
+      ? { score: scoreFile, midi: midiFile, audio: audioFile }
+      : null);
+    if (!assets) {
+      setError("请选择包含 MXL/MusicXML、MIDI 和 MP3 的素材文件夹");
       return;
     }
     setStatus("正在解析本地文件…");
     setError(null);
     try {
-      const [musicXml, midiBuffer] = await Promise.all([readScoreFile(scoreFile), midiFile.arrayBuffer()]);
+      const [musicXml, midiBuffer] = await Promise.all([readScoreFile(assets.score), assets.midi.arrayBuffer()]);
       adoptProject({
-        label: scoreFile.name,
+        label: assets.score.name,
         musicXml,
         score: summarizeMusicXml(musicXml),
         midi: parseMidi(midiBuffer),
-        audioUrl: URL.createObjectURL(audioFile),
+        audioUrl: URL.createObjectURL(assets.audio),
         revokeAudioUrl: true,
       });
       setStatus("本地文件已加载");
@@ -215,39 +274,49 @@ export default function App() {
           <h1>Melody Rain</h1>
           <p className="subtitle">MusicXML 乐谱、MIDI 时间轴与音乐，由同一个 Transport 驱动。</p>
         </div>
-        <div className={`status-pill ${error ? "is-error" : ""}`}>
-          <span className="status-dot" />
-          {error ?? status}
+        <div className="hero-meta">
+          <div className={`status-pill ${error ? "is-error" : ""}`}>
+            <span className="status-dot" />
+            {error ?? status}
+          </div>
+          <div className="transport-stats">
+            <span>{snapshot.effectiveBpm.toFixed(0)} BPM</span>
+            <span>♩ {snapshot.scoreQuarter.toFixed(2)}</span>
+            <span>{stateLabel(snapshot.state)}</span>
+          </div>
         </div>
       </header>
 
       <section className="workspace-grid">
         <aside className="control-panel">
-          <div className="panel-heading">
-            <p className="step-label">01 · SOURCE</p>
-            <h2>本地素材</h2>
+          <div className="folder-picker">
+            <span>素材文件夹</span>
+            <button className="folder-select-button" type="button" onClick={() => void chooseAndLoadAssetFolder()}>
+              {folderName ? `更换文件夹：${folderName}` : "选择素材文件夹"}
+            </button>
+            <input
+              className="folder-input-fallback"
+              type="file"
+              multiple
+              ref={(input) => {
+                folderInputRef.current = input;
+                input?.setAttribute("webkitdirectory", "");
+                input?.setAttribute("directory", "");
+              }}
+              onChange={(event) => selectAssetFolder(event.target.files)}
+              aria-label="选择素材文件夹"
+            />
+            <p>{canRememberFolder()
+              ? "将记住此文件夹，并在刷新后自动重新读取 MXL/MusicXML、MIDI 和 MP3。"
+              : "自动匹配同名的 MXL/MusicXML、MIDI 和 MP3。"}</p>
+            {(scoreFile || midiFile || audioFile) && (
+              <div className="matched-assets">
+                <div><span>乐谱</span><strong>{scoreFile ? assetRelativePath(scoreFile) : "缺失"}</strong></div>
+                <div><span>MIDI</span><strong>{midiFile ? assetRelativePath(midiFile) : "缺失"}</strong></div>
+                <div><span>MP3</span><strong>{audioFile ? assetRelativePath(audioFile) : "缺失"}</strong></div>
+              </div>
+            )}
           </div>
-          <button className="secondary-button" type="button" onClick={() => void loadDemo()}>
-            重新加载示例
-          </button>
-          <div className="file-stack">
-            <label>
-              <span>MXL / MusicXML</span>
-              <input type="file" accept=".mxl,.musicxml,.xml" onChange={(event) => setScoreFile(event.target.files?.[0] ?? null)} />
-            </label>
-            <label>
-              <span>MIDI</span>
-              <input type="file" accept=".mid,.midi,audio/midi" onChange={(event) => setMidiFile(event.target.files?.[0] ?? null)} />
-            </label>
-            <label>
-              <span>MP3</span>
-              <input type="file" accept=".mp3,audio/mpeg" onChange={(event) => setAudioFile(event.target.files?.[0] ?? null)} />
-            </label>
-          </div>
-          <button className="primary-button" type="button" onClick={() => void loadLocalFiles()}>
-            载入所选文件
-          </button>
-
           <div className="layout-control">
             <div className="layout-control-heading">
               <div>
@@ -265,43 +334,34 @@ export default function App() {
               value={measuresPerSystem}
               onChange={(event) => setMeasuresPerSystem(Number(event.target.value))}
             />
-            <p>横屏默认每行 4 个小节；首行自然排版，后续各行与首行栏线对齐。</p>
+            <p>乐谱按原尺寸的 2/3 显示，竖屏默认每行 3 个小节；首行自然排版，后续各行与首行栏线对齐。</p>
           </div>
 
-          {project && (
-            <div className="facts">
-              <div><span>乐谱</span><strong>{project.score.title}</strong></div>
-              <div><span>乐器</span><strong>{project.score.partNames.join(" · ") || "—"}</strong></div>
-              <div><span>小节</span><strong>{project.score.measureCount}</strong></div>
-              <div><span>MIDI 音符</span><strong>{project.midi.noteCount}</strong></div>
-              <div><span>Tempo events</span><strong>{project.midi.tempoMap.length}</strong></div>
-              <div><span>SVG 落点</span><strong>{targetCount}</strong></div>
-            </div>
-          )}
-        </aside>
+          <label className="title-control">
+            <span className="step-label">TITLE</span>
+            <strong>画面标题</strong>
+            <input
+              type="text"
+              value={customTitle}
+              placeholder={project?.label ?? "等待素材"}
+              onChange={(event) => setCustomTitle(event.target.value)}
+              aria-label="画面标题"
+            />
+            <small>留空时使用素材原名称。</small>
+          </label>
 
-        <section className="stage-panel">
-          <div className="stage-toolbar">
-            <div>
-              <p className="step-label">02 · SCORE</p>
-              <h2>{project?.label ?? "等待素材"}</h2>
-            </div>
-            <div className="transport-stats">
-              <span>{snapshot.effectiveBpm.toFixed(0)} BPM</span>
-              <span>♩ {snapshot.scoreQuarter.toFixed(2)}</span>
+          <div className="sidebar-transport" aria-label="播放控制">
+            <audio ref={audioRef} aria-label="乐谱音频" />
+            <div className="sidebar-transport-heading">
+              <p className="step-label">PLAYBACK</p>
               <span>{stateLabel(snapshot.state)}</span>
             </div>
-          </div>
-          <div className="score-viewport">
-            <div ref={scoreHostRef} className="score-host" aria-label="SVG 五线谱预览" />
-          </div>
-
-          <div className="transport-panel">
-            <audio ref={audioRef} aria-label="乐谱音频" />
-            <button className="round-button" type="button" onClick={() => transportRef.current?.rewind()} aria-label="回到开头">↺</button>
-            <button className="play-button" type="button" onClick={() => void togglePlayback()}>
-              {snapshot.state === "playing" ? "暂停" : "播放"}
-            </button>
+            <div className="playback-buttons">
+              <button className="round-button" type="button" onClick={() => transportRef.current?.rewind()} aria-label="回到开头">↺</button>
+              <button className="play-button" type="button" onClick={() => void togglePlayback()}>
+                {snapshot.state === "playing" ? "暂停" : "播放"}
+              </button>
+            </div>
             <div className="timeline-control">
               <input
                 aria-label="播放进度"
@@ -329,16 +389,52 @@ export default function App() {
                 </button>
               ))}
             </div>
-          </div>
-
-          <div className="active-notes" aria-live="polite">
-            <span className="active-label">当前 MIDI 音符</span>
-            <div className="note-list">
-              {activeNotes.length === 0 ? <span className="empty-note">—</span> : activeNotes.map((note) => (
-                <span className="note-chip" key={note.id}>{note.name}<small>{Math.round(note.velocity * 127)}</small></span>
-              ))}
+            <div className="sidebar-active-notes" aria-live="polite">
+              <span className="active-label">当前 MIDI 音符</span>
+              <div className="note-list">
+                {activeNotes.length === 0 ? <span className="empty-note">—</span> : activeNotes.map((note) => (
+                  <span className="note-chip" key={note.id}>{note.name}<small>{Math.round(note.velocity * 127)}</small></span>
+                ))}
+              </div>
             </div>
           </div>
+
+          {project && (
+            <div className="facts">
+              <div><span>乐谱</span><strong>{project.score.title}</strong></div>
+              <div><span>乐器</span><strong>{project.score.partNames.join(" · ") || "—"}</strong></div>
+              <div><span>小节</span><strong>{project.score.measureCount}</strong></div>
+              <div><span>MIDI 音符</span><strong>{project.midi.noteCount}</strong></div>
+              <div><span>Tempo events</span><strong>{project.midi.tempoMap.length}</strong></div>
+              <div><span>SVG 落点</span><strong>{targetCount}</strong></div>
+            </div>
+          )}
+        </aside>
+
+        <section className="stage-panel">
+          <div className="stage-preview-wrap">
+            <div
+              className="portrait-frame"
+              style={{ aspectRatio: PORTRAIT_ASPECT_RATIO }}
+              data-render-profile={PORTRAIT_RENDER_PROFILE.id}
+              aria-label="1080 × 1920 竖屏视频预览"
+            >
+              <div className="stage-toolbar">
+                <div>
+                  <h2>{customTitle.trim() || project?.label || "等待素材"}</h2>
+                </div>
+              </div>
+              <div ref={scoreViewportRef} className="score-viewport">
+                <div ref={scoreHostRef} className="score-host" aria-label="SVG 五线谱预览" />
+              </div>
+            </div>
+            <div className="frame-caption">
+              <span>竖屏视频画幅</span>
+              <strong>{PORTRAIT_RENDER_PROFILE.width} × {PORTRAIT_RENDER_PROFILE.height}</strong>
+              <span>9:16 · {PORTRAIT_RENDER_PROFILE.fps} FPS</span>
+            </div>
+          </div>
+
         </section>
       </section>
     </main>

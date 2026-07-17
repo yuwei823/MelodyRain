@@ -1,5 +1,5 @@
-import type { MidiNoteEvent } from "./midi";
-import type { ScoreTarget } from "./score-renderer";
+import type { MidiNoteEvent, MidiTimeline } from "./midi";
+import type { ScoreTarget, TimedRainSymbol } from "./score-renderer";
 
 export interface RainChord {
   id: string;
@@ -9,8 +9,8 @@ export interface RainChord {
   releaseMs: number;
 }
 
-interface RenderedChord {
-  chord: RainChord;
+interface RenderedRainSymbol {
+  attackMs: number;
   elements: SVGGraphicsElement[];
 }
 
@@ -70,6 +70,46 @@ export function mapRainChords(events: MidiNoteEvent[], targets: ScoreTarget[]): 
   return [...groups.values()].sort((left, right) => left.attackMs - right.attackMs);
 }
 
+/**
+ * MIDI tracks do not consistently preserve the MusicXML staff/voice structure.
+ * Keep unmatched written notes animateable from their score position instead of
+ * leaving their SVG hidden forever (a common failure mode for accompaniment
+ * voices in the bass staff).
+ */
+export function fallbackRainChords(
+  targets: ScoreTarget[],
+  mappedTargetIds: Set<string>,
+  timeAtScoreQuarter: (scoreQuarter: number) => number,
+): RainChord[] {
+  const groups = new Map<string, RainChord>();
+
+  for (const target of targets) {
+    // A continuation note has no separate MIDI note-on, but it is still a
+    // written notehead. Schedule it from score time so it cannot remain
+    // hidden behind the tie/reveal layer.
+    if (!target.notation || mappedTargetIds.has(target.id)) continue;
+
+    const notationId = target.notation.noteElement.id || target.id;
+    const key = `${target.staffIndex}:${notationId}`;
+    const attackMs = timeAtScoreQuarter(target.scoreQuarter);
+    const existing = groups.get(key);
+    if (existing) {
+      existing.targets.push(target);
+      continue;
+    }
+
+    groups.set(key, {
+      id: `fallback-${groups.size}`,
+      events: [],
+      targets: [target],
+      attackMs,
+      releaseMs: attackMs,
+    });
+  }
+
+  return [...groups.values()].sort((left, right) => left.attackMs - right.attackMs);
+}
+
 function mergeBeamedChords(chords: RainChord[]): RainChord[] {
   const parents = chords.map((_, index) => index);
   const firstChordForBeam = new Map<SVGGraphicsElement, number>();
@@ -114,24 +154,31 @@ function mergeBeamedChords(chords: RainChord[]): RainChord[] {
 }
 
 export class RainLayer {
-  private chords: RenderedChord[] = [];
+  private symbols: RenderedRainSymbol[] = [];
 
-  constructor(_container: HTMLElement) {}
+  constructor(_container: HTMLElement, private readonly timeline: MidiTimeline) {}
 
-  setEvents(events: MidiNoteEvent[], targets: ScoreTarget[]): number {
+  setEvents(events: MidiNoteEvent[], targets: ScoreTarget[], rests: TimedRainSymbol[] = []): number {
     this.clearRenderedElements();
-    this.chords = mergeBeamedChords(mapRainChords(events, targets)).map((chord) => this.renderChord(chord));
-    return this.chords.length;
+    const midiChords = mapRainChords(events, targets);
+    const mappedTargetIds = new Set(midiChords.flatMap((chord) => chord.targets.map((target) => target.id)));
+    const noteSymbols = mergeBeamedChords([
+      ...midiChords,
+      ...fallbackRainChords(targets, mappedTargetIds, (scoreQuarter) => this.timeline.timeAtScoreQuarter(scoreQuarter)),
+    ]).map((chord) => this.renderChord(chord));
+    const restSymbols = rests.map((rest) => this.renderRest(rest));
+    this.symbols = [...noteSymbols, ...restSymbols].sort((left, right) => left.attackMs - right.attackMs);
+    return this.symbols.length;
   }
 
   update(timeMs: number): void {
-    for (const { chord, elements } of this.chords) {
-      const startMs = chord.attackMs - FALL_DURATION_MS;
+    for (const { attackMs, elements } of this.symbols) {
+      const startMs = attackMs - FALL_DURATION_MS;
       const isVisible = timeMs >= startMs;
       const rawProgress = Math.max(0, Math.min(1, (timeMs - startMs) / FALL_DURATION_MS));
       const fallOffset = -FALL_DISTANCE_PX * (1 - easeInCubic(rawProgress));
-      const isHit = timeMs >= chord.attackMs && timeMs < chord.attackMs + 260;
-      const isLanded = timeMs >= chord.attackMs;
+      const isHit = timeMs >= attackMs && timeMs < attackMs + 260;
+      const isLanded = timeMs >= attackMs;
 
       elements.forEach((element) => {
         element.style.visibility = isVisible ? "visible" : "hidden";
@@ -144,10 +191,10 @@ export class RainLayer {
 
   dispose(): void {
     this.clearRenderedElements();
-    this.chords = [];
+    this.symbols = [];
   }
 
-  private renderChord(chord: RainChord): RenderedChord {
+  private renderChord(chord: RainChord): RenderedRainSymbol {
     const elements = new Set<SVGGraphicsElement>();
     chord.targets.forEach((target) => {
       if (!target.notation) return;
@@ -156,17 +203,39 @@ export class RainLayer {
       target.notation.beamElements.forEach((element) => elements.add(element));
     });
 
-    const staffClass = (chord.targets[0]?.staffIndex ?? 0) % 2 === 0 ? "staff-treble" : "staff-bass";
+    return this.prepareSymbol(chord.attackMs, [...elements], chord.targets[0]?.staffIndex ?? 0);
+  }
+
+  private renderRest(rest: TimedRainSymbol): RenderedRainSymbol {
+    return this.prepareSymbol(this.timeline.timeAtScoreQuarter(rest.scoreQuarter), rest.elements, rest.staffIndex);
+  }
+
+  private prepareSymbol(attackMs: number, elements: SVGGraphicsElement[], staffIndex: number): RenderedRainSymbol {
+    const staffClass = this.staffClassForElements(elements, staffIndex);
     elements.forEach((element) => {
       element.classList.add("rain-score-symbol", staffClass);
       element.style.visibility = "hidden";
     });
 
-    return { chord, elements: [...elements] };
+    return { attackMs, elements: [...new Set(elements)] };
+  }
+
+  /**
+   * The rendered SVG knows its staff reliably even when OSMD's graphical
+   * staff index does not. Resolve this at the final animation boundary so a
+   * piano's `…-2` bass staff can never inherit the treble class by mistake.
+   */
+  private staffClassForElements(elements: SVGGraphicsElement[], fallbackIndex: number): string {
+    const staffId = elements
+      .map((element) => element.closest(".staffline")?.id)
+      .find(Boolean);
+    const match = staffId?.match(/-(\d+)$/);
+    const index = match ? Number(match[1]) - 1 : fallbackIndex;
+    return index % 2 === 0 ? "staff-treble" : "staff-bass";
   }
 
   private clearRenderedElements(): void {
-    this.chords.flatMap((rendered) => rendered.elements).forEach((element) => {
+    this.symbols.flatMap((rendered) => rendered.elements).forEach((element) => {
       element.classList.remove("rain-score-symbol", "staff-treble", "staff-bass", "is-hit", "is-landed");
       element.style.removeProperty("transform");
       element.style.removeProperty("visibility");

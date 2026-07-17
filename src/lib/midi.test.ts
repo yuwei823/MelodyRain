@@ -1,15 +1,21 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { Midi } from "@tonejs/midi";
 import { describe, expect, it } from "vitest";
 import { MidiTimeline, parseMidi } from "./midi";
 
-const fixture = path.resolve(process.cwd(), "ode-to-joy", "ode-to-joy-easy-variation.mid");
+function createMidiFixture(): ArrayBuffer {
+  const midi = new Midi();
+  midi.header.setTempo(140);
+  const track = midi.addTrack();
+  track.name = "Piano";
+  track.addNote({ midi: 60, time: 0, duration: 0.5, velocity: 0.8 });
+  track.addNote({ midi: 64, time: 1, duration: 0.75, velocity: 0.7 });
+  const bytes = midi.toArray();
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
 
 describe("MIDI timeline", () => {
   it("parses note and tempo events from the bundled MIDI", () => {
-    const source = readFileSync(fixture);
-    const buffer = source.buffer.slice(source.byteOffset, source.byteOffset + source.byteLength) as ArrayBuffer;
-    const summary = parseMidi(buffer);
+    const summary = parseMidi(createMidiFixture());
 
     expect(summary.ppq).toBeGreaterThan(0);
     expect(summary.trackCount).toBeGreaterThan(0);
@@ -20,9 +26,7 @@ describe("MIDI timeline", () => {
   });
 
   it("reports active notes and musical position from the same timeline", () => {
-    const source = readFileSync(fixture);
-    const buffer = source.buffer.slice(source.byteOffset, source.byteOffset + source.byteLength) as ArrayBuffer;
-    const summary = parseMidi(buffer);
+    const summary = parseMidi(createMidiFixture());
     const timeline = new MidiTimeline(summary);
     const first = summary.events[0];
     expect(first).toBeDefined();
