@@ -70,6 +70,7 @@ Thumbs.db
 
 # Build outputs
 dist/
+dist-server/
 build/
 
 # Mac

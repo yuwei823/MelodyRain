@@ -1,11 +1,17 @@
+import type { MidiTimeline } from "./midi";
+
 export type TransportState = "idle" | "playing" | "paused" | "ended";
 
 export interface TransportSnapshot {
   state: TransportState;
+  presentationTimeMs: number;
   sourceTimeMs: number;
   durationMs: number;
+  scoreQuarter: number;
   tempoScale: number;
+  effectiveBpm: number;
   progress: number;
+  activeNoteIds: string[];
 }
 
 export type TransportListener = (snapshot: TransportSnapshot) => void;
@@ -17,26 +23,15 @@ export class MediaTransport {
   private animationFrame: number | null = null;
   private state: TransportState = "idle";
 
-  constructor(audio: HTMLAudioElement) {
+  constructor(audio: HTMLAudioElement, private readonly timeline: MidiTimeline) {
     this.audio = audio;
     this.audio.preload = "metadata";
     this.audio.preservesPitch = true;
-    this.audio.addEventListener("play", () => {
-      this.state = "playing";
-      this.startFrameLoop();
-    });
-    this.audio.addEventListener("pause", () => {
-      if (!this.audio.ended) this.state = this.audio.currentTime > 0 ? "paused" : "idle";
-      this.stopFrameLoop();
-      this.emit();
-    });
-    this.audio.addEventListener("ended", () => {
-      this.state = "ended";
-      this.stopFrameLoop();
-      this.emit();
-    });
-    this.audio.addEventListener("loadedmetadata", () => this.emit());
-    this.audio.addEventListener("seeked", () => this.emit());
+    this.audio.addEventListener("play", this.onPlay);
+    this.audio.addEventListener("pause", this.onPause);
+    this.audio.addEventListener("ended", this.onEnded);
+    this.audio.addEventListener("loadedmetadata", this.emit);
+    this.audio.addEventListener("seeked", this.emit);
   }
 
   subscribe(listener: TransportListener): () => void {
@@ -75,14 +70,47 @@ export class MediaTransport {
   snapshot(): TransportSnapshot {
     const durationMs = Number.isFinite(this.audio.duration) ? this.audio.duration * 1000 : 0;
     const sourceTimeMs = this.audio.currentTime * 1000;
+    const tempo = this.timeline.tempoAt(sourceTimeMs);
     return {
       state: this.state,
+      presentationTimeMs: sourceTimeMs / this.audio.playbackRate,
       sourceTimeMs,
       durationMs,
+      scoreQuarter: this.timeline.scoreQuarterAt(sourceTimeMs),
       tempoScale: this.audio.playbackRate,
+      effectiveBpm: tempo.bpm * this.audio.playbackRate,
       progress: durationMs > 0 ? sourceTimeMs / durationMs : 0,
+      activeNoteIds: this.timeline.activeNotesAt(sourceTimeMs).map((note) => note.id),
     };
   }
+
+  dispose(): void {
+    this.stopFrameLoop();
+    this.audio.pause();
+    this.audio.removeEventListener("play", this.onPlay);
+    this.audio.removeEventListener("pause", this.onPause);
+    this.audio.removeEventListener("ended", this.onEnded);
+    this.audio.removeEventListener("loadedmetadata", this.emit);
+    this.audio.removeEventListener("seeked", this.emit);
+    this.listeners.clear();
+  }
+
+  private readonly onPlay = (): void => {
+    this.state = "playing";
+    this.startFrameLoop();
+  };
+
+  private readonly onPause = (): void => {
+    if (!this.audio.ended) this.state = this.audio.currentTime > 0 ? "paused" : "idle";
+    this.stopFrameLoop();
+    this.emit();
+  };
+
+  private readonly onEnded = (): void => {
+    this.state = "ended";
+    this.stopFrameLoop();
+    this.emit();
+  };
 
   private startFrameLoop(): void {
     if (this.animationFrame !== null) return;
@@ -99,8 +127,8 @@ export class MediaTransport {
     this.animationFrame = null;
   }
 
-  private emit(): void {
+  private readonly emit = (): void => {
     const snapshot = this.snapshot();
     for (const listener of this.listeners) listener(snapshot);
-  }
+  };
 }
