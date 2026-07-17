@@ -1,0 +1,19 @@
+{
+  "name": "melody-rain",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local-first animated sheet-music renderer",
+  "type": "module",
+  "engines": {
+    "node": ">=20.19 <27"
+  },
+  "scripts": {
+    "dev": "concurrently -k \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:web": "vite",
+    "dev:server": "tsx watch src/server/index.ts",
+    "build:web": "vite build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "deps:check": "npm ls --depth=0"
+  }
+}
