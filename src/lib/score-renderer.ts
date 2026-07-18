@@ -58,7 +58,6 @@ export interface TimedScoreSpan {
   element: SVGGraphicsElement;
   startQuarter: number;
   endQuarter: number;
-  growthMode?: "clip" | "stroke";
   startPitchStep?: PitchStep;
   endPitchStep?: PitchStep;
 }
@@ -319,11 +318,11 @@ export class ScoreRenderer {
       '[class*="hammer"]',
       '[class*="pull-off"]',
       '[class*="bend"]',
-      ".vf-line",
     ].join(",");
     const revealSelector = [
       ".vf-stavetempo",
       ".vf-text",
+      ".vf-line",
       '[class*="pedal"]',
       '[class*="octave"]',
       '[class*="volta"]',
@@ -375,7 +374,6 @@ export class ScoreRenderer {
         element,
         startQuarter: start.scoreQuarter,
         endQuarter,
-        growthMode: element.matches(".vf-line") ? "stroke" as const : "clip" as const,
         startPitchStep: start.pitchStep,
         endPitchStep: end?.pitchStep ?? start.pitchStep,
       }];

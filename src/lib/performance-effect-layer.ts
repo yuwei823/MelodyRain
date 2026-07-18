@@ -227,10 +227,6 @@ export class PerformanceEffectLayer {
       content.style.transformOrigin = source.style.transformOrigin || "0 0";
       content.style.opacity = style.opacity;
       content.style.clipPath = source.style.clipPath;
-      content.style.setProperty(
-        "--score-stroke-hidden",
-        source.style.getPropertyValue("--score-stroke-hidden"),
-      );
       const isHit = source.classList.contains("is-hit");
       // Keep the stable landed edge on the base clone. Hit brightness and
       // saturation cannot affect a white alpha mask, so the peak is rendered
@@ -239,10 +235,6 @@ export class PerformanceEffectLayer {
       hitGlow.style.transform = source.style.transform;
       hitGlow.style.transformOrigin = source.style.transformOrigin || "0 0";
       hitGlow.style.clipPath = source.style.clipPath;
-      hitGlow.style.setProperty(
-        "--score-stroke-hidden",
-        source.style.getPropertyValue("--score-stroke-hidden"),
-      );
       hitGlow.classList.toggle("is-active", isHit);
     });
   }

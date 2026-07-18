@@ -18,6 +18,9 @@ const PIANO_WITH_LEDGER_LINES = `<score-partwise version="4.0">
         <clef number="1"><sign>G</sign><line>2</line></clef>
         <clef number="2"><sign>F</sign><line>4</line></clef>
       </attributes>
+      <direction placement="below">
+        <direction-type><wedge type="crescendo"/></direction-type>
+      </direction>
       <note>
         <pitch><step>C</step><octave>7</octave></pitch>
         <duration>4</duration><voice>1</voice><type>quarter</type><stem>down</stem><staff>1</staff>
@@ -30,6 +33,9 @@ const PIANO_WITH_LEDGER_LINES = `<score-partwise version="4.0">
         <pitch><step>A</step><octave>5</octave></pitch>
         <duration>2</duration><voice>1</voice><type>eighth</type><stem>up</stem><staff>1</staff><beam number="1">end</beam>
       </note>
+      <direction placement="below">
+        <direction-type><wedge type="stop"/></direction-type>
+      </direction>
       <note><rest/><duration>8</duration><voice>1</voice><type>half</type><staff>1</staff></note>
       <backup><duration>16</duration></backup>
       <note>
@@ -156,5 +162,9 @@ describe("ScoreRenderer MusicXML integration", () => {
 
     expect(result.maskElements.length).toBeGreaterThan(0);
     expect(result.restSymbols).toHaveLength(1);
+    const hairpins = [...host.querySelectorAll<SVGGraphicsElement>(".vf-line")];
+    expect(hairpins.length).toBeGreaterThan(0);
+    expect(hairpins.every((hairpin) => result.revealElements.some(({ element }) => element === hairpin))).toBe(true);
+    expect(hairpins.every((hairpin) => result.growingSpans.every(({ element }) => element !== hairpin))).toBe(true);
   });
 });
