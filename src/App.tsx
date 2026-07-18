@@ -1,46 +1,22 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { formatDuration } from "./lib/format";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ControlPanel, type BackgroundMode } from "./components/control-panel";
+import { PlaybackPanel } from "./components/playback-panel";
+import { StagePanel } from "./components/stage-panel";
+import { useProjectLoader, type LoadedProject } from "./hooks/use-project-loader";
+import { MidiTimeline } from "./lib/midi";
 import {
-  assetRelativePath,
-  matchProjectFolderAssets,
-  type MatchedProjectAssets,
-} from "./lib/asset-folder";
-import {
-  canReadFolder,
-  canRememberFolder,
-  chooseAssetFolder,
-  filesInFolder,
-  lastRememberedAssetFolder,
-  rememberAssetFolder,
-} from "./lib/remembered-folder";
-import { MidiTimeline, parseMidi, type MidiSummary } from "./lib/midi";
-import { extractMusicXml, summarizeMusicXml, type ScoreSummary } from "./lib/mxl";
-import {
-  PERFORMANCE_RAINBOW_PALETTE,
   PerformanceEffectLayer,
   mergePerformanceVisuals,
   type PerformanceEffectConfig,
   type PerformanceEffectMode,
 } from "./lib/performance-effect-layer";
 import { RainLayer } from "./lib/rain-layer";
-import { PORTRAIT_ASPECT_RATIO, PORTRAIT_RENDER_PROFILE } from "./lib/render-profile";
-import { ScoreRenderer } from "./lib/score-renderer";
+import { PORTRAIT_RENDER_PROFILE } from "./lib/render-profile";
 import { ScoreCamera } from "./lib/score-camera";
 import { ScoreMaskLayer, type ScoreMaskSource } from "./lib/score-mask-layer";
+import { ScoreRenderer } from "./lib/score-renderer";
 import { ScoreTimelineLayer } from "./lib/score-timeline-layer";
 import { MediaTransport, TRANSPORT_PRE_ROLL_MS, type TransportSnapshot } from "./lib/transport";
-
-interface LoadedProject {
-  label: string;
-  musicXml: string;
-  score: ScoreSummary;
-  midi: MidiSummary;
-  audioUrl: string;
-  backgrounds: File[];
-  revokeAudioUrl?: boolean;
-}
-
-type BackgroundMode = "image" | "color";
 
 const EMPTY_SNAPSHOT: TransportSnapshot = {
   state: "idle",
@@ -56,25 +32,13 @@ const EMPTY_SNAPSHOT: TransportSnapshot = {
 
 const PLAYING_UI_REFRESH_INTERVAL_MS = 50;
 
-async function readScoreFile(file: File): Promise<string> {
-  return file.name.toLowerCase().endsWith(".mxl") ? extractMusicXml(await file.arrayBuffer()) : file.text();
-}
-
 function stateLabel(state: TransportSnapshot["state"]): string {
   return { idle: "待播放", playing: "播放中", paused: "已暂停", ended: "已结束" }[state];
 }
 
 export default function App() {
-  const [project, setProject] = useState<LoadedProject | null>(null);
   const [snapshot, setSnapshot] = useState(EMPTY_SNAPSHOT);
-  const [status, setStatus] = useState("请选择素材文件夹");
-  const [error, setError] = useState<string | null>(null);
   const [targetCount, setTargetCount] = useState(0);
-  const [scoreFile, setScoreFile] = useState<File | null>(null);
-  const [midiFile, setMidiFile] = useState<File | null>(null);
-  const [audioFile, setAudioFile] = useState<File | null>(null);
-  const [backgroundFiles, setBackgroundFiles] = useState<File[]>([]);
-  const [folderName, setFolderName] = useState<string | null>(null);
   const [customTitle, setCustomTitle] = useState("");
   const [measuresPerSystem, setMeasuresPerSystem] = useState(PORTRAIT_RENDER_PROFILE.measuresPerSystem);
   const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>("color");
@@ -95,17 +59,29 @@ export default function App() {
   const scoreCameraRef = useRef<ScoreCamera | null>(null);
   const scoreMaskLayerRef = useRef<ScoreMaskLayer | null>(null);
   const performanceEffectLayerRef = useRef<PerformanceEffectLayer | null>(null);
-  const folderInputRef = useRef<HTMLInputElement>(null);
-  const loadRequestRef = useRef(0);
 
-  const adoptProject = useCallback((nextProject: LoadedProject) => {
-    setProject(nextProject);
+  const handleProjectLoaded = useCallback((nextProject: LoadedProject) => {
     setCustomTitle("");
     setSelectedBackgroundIndex(0);
     setBackgroundMode(nextProject.backgrounds.length > 0 ? "image" : "color");
     setSnapshot(EMPTY_SNAPSHOT);
-    setError(null);
   }, []);
+  const {
+    project,
+    status,
+    error,
+    setStatus,
+    setError,
+    scoreFile,
+    midiFile,
+    audioFile,
+    backgroundFiles,
+    folderName,
+    folderInputRef,
+    remembersFolders,
+    selectAssetFolder,
+    chooseAndLoadAssetFolder,
+  } = useProjectLoader({ onProjectLoaded: handleProjectLoaded });
 
   const selectedBackgroundFile = project?.backgrounds[selectedBackgroundIndex] ?? null;
   useEffect(() => {
@@ -174,8 +150,6 @@ export default function App() {
         rainLayer.update(currentTimeMs);
         rainLayerRef.current = rainLayer;
         const scoreTimelineLayer = new ScoreTimelineLayer(timeline);
-        // Tie curves are growing spans; their continuation noteheads stay in
-        // the rain layer, avoiding two layers competing to hide the same SVG.
         scoreTimelineLayer.setElements(revealElements, growingSpans);
         scoreTimelineLayer.update(currentTimeMs);
         scoreTimelineLayerRef.current = scoreTimelineLayer;
@@ -272,13 +246,6 @@ export default function App() {
     };
   }, [project]);
 
-  useEffect(
-    () => () => {
-      if (project?.revokeAudioUrl) URL.revokeObjectURL(project.audioUrl);
-    },
-    [project],
-  );
-
   const midiEventsById = useMemo(
     () => new Map(project?.midi.events.map((event) => [event.id, event]) ?? []),
     [project],
@@ -287,94 +254,6 @@ export default function App() {
     const event = midiEventsById.get(id);
     return event ? [event] : [];
   }), [midiEventsById, snapshot.activeNoteIds]);
-
-  const loadRememberedFolder = async () => {
-    try {
-      const handle = await lastRememberedAssetFolder();
-      if (!handle) return;
-      setFolderName(handle.name);
-      if (!await canReadFolder(handle)) {
-        setStatus(`已记住“${handle.name}”，请重新选择以授权读取。`);
-        return;
-      }
-      setStatus(`正在重新读取“${handle.name}”…`);
-      selectAssetFolderFromFiles(await filesInFolder(handle));
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught));
-    }
-  };
-
-  useEffect(() => {
-    if (canRememberFolder()) void loadRememberedFolder();
-  }, []);
-
-  const selectAssetFolderFromFiles = (files: File[]) => {
-    const requestId = ++loadRequestRef.current;
-    setScoreFile(null);
-    setMidiFile(null);
-    setAudioFile(null);
-    setBackgroundFiles([]);
-    if (files.length === 0) {
-      setStatus("尚未选择素材文件夹");
-      return;
-    }
-    try {
-      const matched = matchProjectFolderAssets(files);
-      setScoreFile(matched.score);
-      setMidiFile(matched.midi);
-      setAudioFile(matched.audio);
-      setBackgroundFiles(matched.backgrounds);
-      setError(null);
-      void loadLocalFiles(matched, requestId);
-    } catch (caught) {
-      setStatus("素材匹配失败");
-      setError(caught instanceof Error ? caught.message : String(caught));
-    }
-  };
-
-  const selectAssetFolder = (files: FileList | null) => {
-    setFolderName(files?.[0]?.webkitRelativePath.split("/")[0] ?? null);
-    selectAssetFolderFromFiles(files ? [...files] : []);
-  };
-
-  const chooseAndLoadAssetFolder = async () => {
-    if (!canRememberFolder()) {
-      folderInputRef.current?.click();
-      return;
-    }
-    try {
-      const handle = await chooseAssetFolder();
-      await rememberAssetFolder(handle);
-      setFolderName(handle.name);
-      selectAssetFolderFromFiles(await filesInFolder(handle));
-    } catch (caught) {
-      if (caught instanceof DOMException && caught.name === "AbortError") return;
-      setError(caught instanceof Error ? caught.message : String(caught));
-    }
-  };
-
-  const loadLocalFiles = async (assets: MatchedProjectAssets<File>, requestId: number) => {
-    setStatus("正在解析本地文件…");
-    setError(null);
-    try {
-      const [musicXml, midiBuffer] = await Promise.all([readScoreFile(assets.score), assets.midi.arrayBuffer()]);
-      if (requestId !== loadRequestRef.current) return;
-      adoptProject({
-        label: assets.score.name,
-        musicXml,
-        score: summarizeMusicXml(musicXml),
-        midi: parseMidi(midiBuffer),
-        audioUrl: URL.createObjectURL(assets.audio),
-        backgrounds: assets.backgrounds,
-        revokeAudioUrl: true,
-      });
-      setStatus("本地文件已加载");
-    } catch (caught) {
-      if (requestId !== loadRequestRef.current) return;
-      setStatus("解析失败");
-      setError(caught instanceof Error ? caught.message : String(caught));
-    }
-  };
 
   const togglePlayback = async () => {
     try {
@@ -405,299 +284,55 @@ export default function App() {
       </header>
 
       <section className="workspace-grid">
-        <aside className="control-panel">
-          <div className="folder-picker">
-            <span>素材文件夹</span>
-            <button className="folder-select-button" type="button" onClick={() => void chooseAndLoadAssetFolder()}>
-              {folderName ? `更换文件夹：${folderName}` : "选择素材文件夹"}
-            </button>
-            <input
-              className="folder-input-fallback"
-              type="file"
-              multiple
-              ref={(input) => {
-                folderInputRef.current = input;
-                input?.setAttribute("webkitdirectory", "");
-                input?.setAttribute("directory", "");
-              }}
-              onChange={(event) => selectAssetFolder(event.target.files)}
-              aria-label="选择素材文件夹"
-            />
-            <p>{canRememberFolder()
-              ? "将记住此文件夹，并在刷新后自动重新读取乐谱、MIDI、MP3 和背景图片。"
-              : "自动匹配同名的 MXL/MusicXML、MIDI 和 MP3，并读取背景图片。"}</p>
-            {(scoreFile || midiFile || audioFile || backgroundFiles.length > 0) && (
-              <div className="matched-assets">
-                <div><span>乐谱</span><strong>{scoreFile ? assetRelativePath(scoreFile) : "缺失"}</strong></div>
-                <div><span>MIDI</span><strong>{midiFile ? assetRelativePath(midiFile) : "缺失"}</strong></div>
-                <div><span>MP3</span><strong>{audioFile ? assetRelativePath(audioFile) : "缺失"}</strong></div>
-                <div>
-                  <span>背景</span>
-                  <strong>{backgroundFiles.length > 0 ? `${backgroundFiles.length} 张图片` : "纯色 #000000"}</strong>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <label className="title-control">
-            <span className="step-label">TITLE</span>
-            <strong>画面标题</strong>
-            <input
-              type="text"
-              value={customTitle}
-              placeholder={project?.label ?? "等待素材"}
-              onChange={(event) => setCustomTitle(event.target.value)}
-              aria-label="画面标题"
-            />
-            <small>留空时使用素材原名称。</small>
-          </label>
-
-          <div className="layout-control">
-            <div className="layout-control-heading">
-              <div>
-                <p className="step-label">LAYOUT</p>
-                <strong>每行小节数</strong>
-              </div>
-              <output>{measuresPerSystem}</output>
-            </div>
-            <input
-              aria-label="每行小节数"
-              type="range"
-              min="1"
-              max="6"
-              step="1"
-              value={measuresPerSystem}
-              onChange={(event) => setMeasuresPerSystem(Number(event.target.value))}
-            />
-          </div>
-
-          <div className="background-control">
-            <div>
-              <p className="step-label">MASK SOURCE</p>
-              <strong>谱面蒙版背景</strong>
-            </div>
-            <div className="background-mode" aria-label="蒙版背景模式">
-              <button
-                type="button"
-                aria-pressed={backgroundMode === "image"}
-                disabled={!project?.backgrounds.length}
-                onClick={() => setBackgroundMode("image")}
-              >
-                图片
-              </button>
-              <button
-                type="button"
-                aria-pressed={backgroundMode === "color"}
-                onClick={() => setBackgroundMode("color")}
-              >
-                纯色
-              </button>
-            </div>
-            {backgroundMode === "image" && project?.backgrounds.length ? (
-              <label>
-                <span>背景图片</span>
-                <select
-                  value={selectedBackgroundIndex}
-                  onChange={(event) => setSelectedBackgroundIndex(Number(event.target.value))}
-                >
-                  {project.backgrounds.map((background, index) => (
-                    <option value={index} key={assetRelativePath(background)}>
-                      {assetRelativePath(background)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : (
-              <label className="color-control">
-                <span>背景颜色</span>
-                <input
-                  type="color"
-                  value={backgroundColor}
-                  onChange={(event) => setBackgroundColor(event.target.value)}
-                  aria-label="蒙版背景颜色"
-                />
-                <output>{backgroundColor.toUpperCase()}</output>
-              </label>
-            )}
-            <label className="black-mix-control">
-              <span>黑色混入</span>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                step="1"
-                value={maskBlackMixPercent}
-                onChange={(event) => setMaskBlackMixPercent(Number(event.target.value))}
-                aria-label="蒙版黑色混入比例"
-              />
-              <output>{maskBlackMixPercent}%</output>
-            </label>
-            <label className="paper-transparency-control">
-              <span>谱纸透明度</span>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                step="1"
-                value={paperTransparencyPercent}
-                onChange={(event) => setPaperTransparencyPercent(Number(event.target.value))}
-                aria-label="浅色谱纸透明度"
-              />
-              <output>{paperTransparencyPercent}%</output>
-            </label>
-          </div>
-
-          <div className="performance-effect-control">
-            <div>
-              <p className="step-label">PERFORMANCE EFFECT</p>
-              <strong>演奏元素效果</strong>
-            </div>
-            <div className="background-mode" aria-label="演奏元素效果模式">
-              <button
-                type="button"
-                aria-pressed={performanceEffectMode === "mask"}
-                onClick={() => setPerformanceEffectMode("mask")}
-              >
-                共用蒙版
-              </button>
-              <button
-                type="button"
-                aria-pressed={performanceEffectMode === "rainbow"}
-                onClick={() => setPerformanceEffectMode("rainbow")}
-              >
-                彩虹色
-              </button>
-            </div>
-            {performanceEffectMode === "mask" ? (
-              <>
-                <label className="color-control">
-                  <span>混入颜色</span>
-                  <input
-                    type="color"
-                    value={performanceMixColor}
-                    onChange={(event) => setPerformanceMixColor(event.target.value)}
-                    aria-label="演奏元素混入颜色"
-                  />
-                  <output>{performanceMixColor.toUpperCase()}</output>
-                </label>
-                <label className="performance-mix-control">
-                  <span>混入强度</span>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="1"
-                    value={performanceMixPercent}
-                    onChange={(event) => setPerformanceMixPercent(Number(event.target.value))}
-                    aria-label="演奏元素混入强度"
-                  />
-                  <output>{performanceMixPercent}%</output>
-                </label>
-                <small>与谱面共用同一背景源和固定裁切位置，仅单独叠加所选颜色。</small>
-              </>
-            ) : (
-              <>
-                <div className="performance-palette" aria-label="C D E F G A B 彩虹配色">
-                  {Object.entries(PERFORMANCE_RAINBOW_PALETTE).map(([step, color]) => (
-                    <span key={step} style={{ "--performance-color": color } as CSSProperties}>
-                      {step}
-                    </span>
-                  ))}
-                </div>
-                <small>音头按书写音名着色；和弦符杆取远端音，连梁与无音高元素使用渐变。</small>
-              </>
-            )}
-          </div>
-
-        </aside>
-
-        <aside className="playback-panel">
-          <div className="sidebar-transport" aria-label="播放控制">
-            <audio ref={audioRef} aria-label="乐谱音频" />
-            <div className="sidebar-transport-heading">
-              <p className="step-label">PLAYBACK</p>
-              <span>{stateLabel(snapshot.state)}</span>
-            </div>
-            <div className="playback-buttons">
-              <button className="round-button" type="button" onClick={() => transportRef.current?.rewind()} aria-label="回到开头">↺</button>
-              <button className="play-button" type="button" onClick={() => void togglePlayback()}>
-                {snapshot.state === "playing" ? "暂停" : "播放"}
-              </button>
-            </div>
-            <div className="timeline-control">
-              <input
-                aria-label="播放进度"
-                type="range"
-                min="0"
-                max="1"
-                step="0.0001"
-                value={snapshot.progress}
-                onChange={(event) => transportRef.current?.seek(Number(event.target.value))}
-              />
-              <div className="time-row">
-                <span>{formatDuration(snapshot.sourceTimeMs)}</span>
-                <span>{formatDuration(snapshot.durationMs || project?.midi.durationMs || 0)}</span>
-              </div>
-            </div>
-            <div className="speed-group" aria-label="播放速度">
-              {[0.5, 0.75, 1].map((speed) => (
-                <button
-                  type="button"
-                  className={snapshot.tempoScale === speed ? "is-active" : ""}
-                  key={speed}
-                  onClick={() => transportRef.current?.setTempoScale(speed)}
-                >
-                  {speed}×
-                </button>
-              ))}
-            </div>
-            <div className="sidebar-active-notes" aria-live="polite">
-              <span className="active-label">当前 MIDI 音符</span>
-              <div className="note-list">
-                {activeNotes.length === 0 ? <span className="empty-note">—</span> : activeNotes.map((note) => (
-                  <span className="note-chip" key={note.id}>{note.name}<small>{Math.round(note.velocity * 127)}</small></span>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {project && (
-            <div className="facts">
-              <div><span>乐谱</span><strong>{project.score.title}</strong></div>
-              <div><span>乐器</span><strong>{project.score.partNames.join(" · ") || "—"}</strong></div>
-              <div><span>小节</span><strong>{project.score.measureCount}</strong></div>
-              <div><span>MIDI 音符</span><strong>{project.midi.noteCount}</strong></div>
-              <div><span>Tempo events</span><strong>{project.midi.tempoMap.length}</strong></div>
-              <div><span>SVG 落点</span><strong>{targetCount}</strong></div>
-            </div>
-          )}
-        </aside>
-
-        <section className="stage-panel">
-          <div className="stage-preview-wrap">
-            <div
-              className="portrait-frame"
-              style={{ aspectRatio: PORTRAIT_ASPECT_RATIO }}
-              data-render-profile={PORTRAIT_RENDER_PROFILE.id}
-              aria-label="1080 × 1920 竖屏视频预览"
-            >
-              <div className="stage-toolbar">
-                <div>
-                  <h2>{customTitle.trim() || project?.label || "等待素材"}</h2>
-                </div>
-              </div>
-              <div ref={scoreViewportRef} className="score-viewport">
-                <div ref={scoreHostRef} className="score-host" aria-label="SVG 五线谱预览" />
-              </div>
-            </div>
-            <div className="frame-caption">
-              <span>竖屏视频画幅</span>
-              <strong>{PORTRAIT_RENDER_PROFILE.width} × {PORTRAIT_RENDER_PROFILE.height}</strong>
-              <span>9:16 · {PORTRAIT_RENDER_PROFILE.fps} FPS</span>
-            </div>
-          </div>
-
-        </section>
+        <ControlPanel
+          project={project}
+          folderName={folderName}
+          remembersFolders={remembersFolders}
+          scoreFile={scoreFile}
+          midiFile={midiFile}
+          audioFile={audioFile}
+          backgroundFiles={backgroundFiles}
+          folderInputRef={folderInputRef}
+          onChooseFolder={() => void chooseAndLoadAssetFolder()}
+          onSelectFolder={selectAssetFolder}
+          customTitle={customTitle}
+          onCustomTitleChange={setCustomTitle}
+          measuresPerSystem={measuresPerSystem}
+          onMeasuresPerSystemChange={setMeasuresPerSystem}
+          backgroundMode={backgroundMode}
+          onBackgroundModeChange={setBackgroundMode}
+          backgroundColor={backgroundColor}
+          onBackgroundColorChange={setBackgroundColor}
+          selectedBackgroundIndex={selectedBackgroundIndex}
+          onSelectedBackgroundIndexChange={setSelectedBackgroundIndex}
+          maskBlackMixPercent={maskBlackMixPercent}
+          onMaskBlackMixPercentChange={setMaskBlackMixPercent}
+          paperTransparencyPercent={paperTransparencyPercent}
+          onPaperTransparencyPercentChange={setPaperTransparencyPercent}
+          performanceEffectMode={performanceEffectMode}
+          onPerformanceEffectModeChange={setPerformanceEffectMode}
+          performanceMixColor={performanceMixColor}
+          onPerformanceMixColorChange={setPerformanceMixColor}
+          performanceMixPercent={performanceMixPercent}
+          onPerformanceMixPercentChange={setPerformanceMixPercent}
+        />
+        <PlaybackPanel
+          project={project}
+          snapshot={snapshot}
+          activeNotes={activeNotes}
+          targetCount={targetCount}
+          audioRef={audioRef}
+          stateLabel={stateLabel(snapshot.state)}
+          onTogglePlayback={() => void togglePlayback()}
+          onRewind={() => transportRef.current?.rewind()}
+          onSeek={(progress) => transportRef.current?.seek(progress)}
+          onTempoScaleChange={(scale) => transportRef.current?.setTempoScale(scale)}
+        />
+        <StagePanel
+          title={customTitle.trim() || project?.label || "等待素材"}
+          scoreViewportRef={scoreViewportRef}
+          scoreHostRef={scoreHostRef}
+        />
       </section>
     </main>
   );

@@ -133,6 +133,9 @@ export class PerformanceEffectLayer {
   private maskSources: SVGGraphicsElement[] = [];
   private paints: PerformancePaintAssignment[] = [];
   private config: PerformanceEffectConfig = { mode: "mask", mixColor: "#1CAEE8", mixAmount: 0.35 };
+  private rainbowPreparationIndex = 0;
+  private rainbowPreparationFrame: number | null = null;
+  private rainbowReady = false;
   private lastViewportWidth = 0;
   private lastViewportHeight = 0;
 
@@ -172,6 +175,7 @@ export class PerformanceEffectLayer {
     this.maskSources = uniqueSvgElements(visuals.maskElements);
     this.paints = visuals.paints;
     this.rebuildMaskClones();
+    this.startRainbowPreparation();
     this.applyMode();
   }
 
@@ -234,8 +238,6 @@ export class PerformanceEffectLayer {
   }
 
   private applyMode(): void {
-    this.clearMaskSources();
-    this.clearRainbowPaints();
     if (this.config.mode === "mask") {
       this.viewport.classList.add("performance-mask-mode");
       this.overlay.style.display = "block";
@@ -243,9 +245,20 @@ export class PerformanceEffectLayer {
       this.update();
       return;
     }
+    if (!this.rainbowReady) {
+      this.viewport.classList.add("performance-mask-mode");
+      this.overlay.style.display = "block";
+      this.maskSources.forEach((element) => element.classList.add("performance-mask-source"));
+      this.scheduleRainbowPreparation();
+      return;
+    }
+    this.showRainbowMode();
+  }
+
+  private showRainbowMode(): void {
+    this.clearMaskSources();
     this.viewport.classList.remove("performance-mask-mode");
     this.overlay.style.display = "none";
-    this.paints.forEach(({ element, paint }) => this.applyRainbowPaint(element, paint));
   }
 
   private clearMaskSources(): void {
@@ -277,6 +290,10 @@ export class PerformanceEffectLayer {
   }
 
   private clearRainbowPaints(): void {
+    if (this.rainbowPreparationFrame !== null) {
+      cancelAnimationFrame(this.rainbowPreparationFrame);
+      this.rainbowPreparationFrame = null;
+    }
     this.originals.forEach(({ element, fill, fillPriority, stroke, strokePriority, color, colorPriority }) => {
       if (fill) element.style.setProperty("fill", fill, fillPriority);
       else element.style.removeProperty("fill");
@@ -290,6 +307,48 @@ export class PerformanceEffectLayer {
     this.gradientDefs.clear();
     this.gradientContainers.clear();
     this.gradientCache.clear();
+    this.rainbowPreparationIndex = 0;
+    this.rainbowReady = false;
+  }
+
+  private startRainbowPreparation(): void {
+    this.rainbowPreparationIndex = 0;
+    this.rainbowReady = this.paints.length === 0;
+    if (!this.rainbowReady) this.scheduleRainbowPreparation();
+  }
+
+  private scheduleRainbowPreparation(): void {
+    if (this.rainbowReady || this.rainbowPreparationFrame !== null) return;
+    this.rainbowPreparationFrame = requestAnimationFrame(() => {
+      this.rainbowPreparationFrame = null;
+      const startedAt = performance.now();
+      const batch: PerformancePaintAssignment[] = [];
+      while (
+        this.rainbowPreparationIndex < this.paints.length
+        && batch.length < 40
+        && (batch.length === 0 || performance.now() - startedAt < 6)
+      ) {
+        batch.push(this.paints[this.rainbowPreparationIndex++]!);
+      }
+
+      const maskedOwners = uniqueSvgElements(batch.flatMap(({ element }) => {
+        const owner = element.closest<SVGGraphicsElement>(".performance-mask-source");
+        return owner ? [owner] : [];
+      }));
+      const hadMaskMode = this.viewport.classList.contains("performance-mask-mode");
+      if (hadMaskMode) this.viewport.classList.remove("performance-mask-mode");
+      maskedOwners.forEach((element) => element.classList.remove("performance-mask-source"));
+      batch.forEach(({ element, paint }) => this.applyRainbowPaint(element, paint));
+      maskedOwners.forEach((element) => element.classList.add("performance-mask-source"));
+      if (hadMaskMode) this.viewport.classList.add("performance-mask-mode");
+
+      this.rainbowReady = this.rainbowPreparationIndex >= this.paints.length;
+      if (this.rainbowReady) {
+        if (this.config.mode === "rainbow") this.showRainbowMode();
+      } else {
+        this.scheduleRainbowPreparation();
+      }
+    });
   }
 
   private gradientValue(element: SVGGraphicsElement, stops: PerformanceGradientStop[]): string {

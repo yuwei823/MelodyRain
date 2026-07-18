@@ -1,4 +1,4 @@
-import { OpenSheetMusicDisplay } from "opensheetmusicdisplay";
+import type { OpenSheetMusicDisplay } from "opensheetmusicdisplay";
 import { applyMeasuresPerSystem } from "./score-layout";
 import {
   pitchStepFromFundamentalNote,
@@ -77,23 +77,16 @@ interface SvgBackedGraphicalNote {
 }
 
 export class ScoreRenderer {
-  private readonly osmd: OpenSheetMusicDisplay;
+  private osmd: OpenSheetMusicDisplay | null = null;
+  private osmdPromise: Promise<OpenSheetMusicDisplay> | null = null;
 
-  constructor(private readonly container: HTMLElement) {
-    this.osmd = new OpenSheetMusicDisplay(container, {
-      autoResize: true,
-      backend: "svg",
-      drawTitle: false,
-      drawingParameters: "compacttight",
-      followCursor: false,
-      newSystemFromXML: true,
-    });
-  }
+  constructor(private readonly container: HTMLElement) {}
 
   async render(musicXml: string, measuresPerSystem = 4, _requestedScoreScale?: number): Promise<ScoreRenderResult> {
+    const osmd = await this.ensureOsmd();
     const laidOutXml = applyMeasuresPerSystem(musicXml, measuresPerSystem);
-    this.osmd.clear();
-    await this.osmd.load(laidOutXml);
+    osmd.clear();
+    await osmd.load(laidOutXml);
     const availableWidth = Math.max(320, this.container.clientWidth);
     const reservedWidthInOsmdUnits = measuresPerSystem === 1 ? 13 : 15;
     // OSMD/VexFlow adds clef, key-signature and connector space around the fixed measure body.
@@ -102,14 +95,14 @@ export class ScoreRenderer {
       7,
       (availableWidth / 10 / measuresPerSystem - reservedWidthInOsmdUnits / measuresPerSystem) * 0.72,
     );
-    this.osmd.EngravingRules.FixedMeasureWidth = true;
-    this.osmd.EngravingRules.FixedMeasureWidthFixedValue = equalMeasureWidth;
-    this.osmd.EngravingRules.FixedMeasureWidthUseForPickupMeasures = true;
-    this.osmd.EngravingRules.RenderXMeasuresPerLineAkaSystem = measuresPerSystem;
-    this.osmd.Zoom = 1;
-    this.osmd.render();
+    osmd.EngravingRules.FixedMeasureWidth = true;
+    osmd.EngravingRules.FixedMeasureWidthFixedValue = equalMeasureWidth;
+    osmd.EngravingRules.FixedMeasureWidthUseForPickupMeasures = true;
+    osmd.EngravingRules.RenderXMeasuresPerLineAkaSystem = measuresPerSystem;
+    osmd.Zoom = 1;
+    osmd.render();
     if (this.matchMeasureWidthsToFirstSystem()) {
-      this.osmd.render();
+      osmd.render();
     }
     const { targets, restSymbols } = this.collectTargets();
     const { revealElements, growingSpans } = this.collectTimedScoreElements(targets);
@@ -117,7 +110,30 @@ export class ScoreRenderer {
     return { targets, restSymbols, revealElements, growingSpans, maskElements };
   }
 
+  private ensureOsmd(): Promise<OpenSheetMusicDisplay> {
+    if (this.osmd) return Promise.resolve(this.osmd);
+    this.osmdPromise ??= import("opensheetmusicdisplay").then(({ OpenSheetMusicDisplay }) => {
+      const osmd = new OpenSheetMusicDisplay(this.container, {
+        autoResize: true,
+        backend: "svg",
+        drawTitle: false,
+        drawingParameters: "compacttight",
+        followCursor: false,
+        newSystemFromXML: true,
+      });
+      this.osmd = osmd;
+      return osmd;
+    });
+    return this.osmdPromise;
+  }
+
+  private requireOsmd(): OpenSheetMusicDisplay {
+    if (!this.osmd) throw new Error("OSMD 尚未加载");
+    return this.osmd;
+  }
+
   private matchMeasureWidthsToFirstSystem(): boolean {
+    const osmd = this.requireOsmd();
     const staffLines = [...this.container.querySelectorAll<SVGGElement>(".staffline")];
     const referenceStaffLine = staffLines[0];
     if (!referenceStaffLine) return false;
@@ -134,7 +150,7 @@ export class ScoreRenderer {
         const target = referenceMeasures[index]?.getBBox();
         if (!target || source.width <= 0) return;
 
-        const sourceMeasure = this.osmd.Sheet.SourceMeasures.find(
+        const sourceMeasure = osmd.Sheet.SourceMeasures.find(
           (candidate) => String(candidate.MeasureNumberXML) === measure.id,
         );
         if (!sourceMeasure) return;
@@ -148,9 +164,10 @@ export class ScoreRenderer {
   }
 
   private collectTargets(): Pick<ScoreRenderResult, "targets" | "restSymbols"> {
+    const osmd = this.requireOsmd();
     const targets: ScoreTarget[] = [];
     const restSymbols = new Map<string, TimedRainSymbol>();
-    const containers = this.osmd.GraphicSheet.VerticalGraphicalStaffEntryContainers;
+    const containers = osmd.GraphicSheet.VerticalGraphicalStaffEntryContainers;
     const hostBounds = this.container.getBoundingClientRect();
 
     for (const vertical of containers) {
@@ -159,7 +176,7 @@ export class ScoreRenderer {
         if (!staffEntry) return;
         for (const voiceEntry of staffEntry.graphicalVoiceEntries) {
           for (const note of voiceEntry.notes) {
-            const point = this.osmd.GraphicSheet.svgToDom(note.PositionAndShape.AbsolutePosition);
+            const point = osmd.GraphicSheet.svgToDom(note.PositionAndShape.AbsolutePosition);
             const svgNote = note as unknown as SvgBackedGraphicalNote;
             const notehead = this.findNotehead(svgNote, point, hostBounds);
             const stem = this.findStem(svgNote, hostBounds);

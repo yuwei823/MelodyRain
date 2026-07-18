@@ -27,5 +27,10 @@ export function applyMeasuresPerSystem(musicXml: string, measuresPerSystem: numb
     });
   }
 
-  return new XMLSerializer().serializeToString(document);
+  const serialized = new XMLSerializer().serializeToString(document);
+  // OSMD 2.x distinguishes inline XML from a URL by the XML declaration.
+  // DOM XMLSerializer implementations commonly omit that declaration.
+  return serialized.startsWith("<?xml")
+    ? serialized
+    : `<?xml version="1.0" encoding="UTF-8"?>${serialized}`;
 }
