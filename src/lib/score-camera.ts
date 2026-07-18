@@ -48,7 +48,7 @@ function systemsFromAnchors(anchors: VerticalCameraAnchor[]): VerticalCameraSyst
     current.lastX = column.x;
   });
 
-  return systems.map(({ startQuarter, top, bottom }) => ({ startQuarter, centerY: (top + bottom) / 2 }));
+  return systems.map(({ startQuarter, top, bottom }) => ({ startQuarter, centerY: (top + bottom) / 1.8 }));
 }
 
 export function verticalCameraOffset(

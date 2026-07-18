@@ -92,11 +92,11 @@ button { color: inherit; }
 .transport-stats { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
 .transport-stats span { padding: 7px 10px; border-radius: 8px; background: rgba(123, 166, 203, .08); color: #9fb3c8; font-size: 11px; font-variant-numeric: tabular-nums; }
 .score-viewport { position: relative; min-height: 0; flex: 1; overflow: hidden; isolation: isolate; background: #eef1f5; scrollbar-color: #5d7188 transparent; }
-.score-host { position: relative; z-index: 2; min-height: 100%; color: #10151b; will-change: transform; transition: transform 360ms ease-out; }
+.score-host { position: relative; z-index: 2; min-height: 100%; color: #10151b; will-change: transform; transition: transform 900ms ease-out; }
 .score-host svg { display: block; }
 .score-mask-layer { position: absolute; z-index: 1; inset: 0; overflow: hidden; pointer-events: none; }
 .score-mask-layer > svg { display: block; width: 100%; height: 100%; }
-.score-mask-geometry { transform: translateY(var(--score-camera-offset-y, 0px)); transform-origin: 0 0; will-change: transform; transition: transform 360ms ease-out; }
+.score-mask-geometry { transform: translateY(var(--score-camera-offset-y, 0px)); transform-origin: 0 0; will-change: transform; transition: transform 900ms ease-out; }
 .rain-score-symbol { color: #1caee8; opacity: .9; pointer-events: none; will-change: transform, filter; }
 .rain-score-symbol.staff-bass { color: #8357df; }
 .rain-score-symbol [fill]:not([fill="none"]) { fill: currentColor !important; }
