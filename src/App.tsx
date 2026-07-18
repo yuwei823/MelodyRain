@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { formatDuration } from "./lib/format";
 import {
   assetRelativePath,
@@ -15,6 +15,13 @@ import {
 } from "./lib/remembered-folder";
 import { MidiTimeline, parseMidi, type MidiSummary } from "./lib/midi";
 import { extractMusicXml, summarizeMusicXml, type ScoreSummary } from "./lib/mxl";
+import {
+  PERFORMANCE_RAINBOW_PALETTE,
+  PerformanceEffectLayer,
+  mergePerformanceVisuals,
+  type PerformanceEffectConfig,
+  type PerformanceEffectMode,
+} from "./lib/performance-effect-layer";
 import { RainLayer } from "./lib/rain-layer";
 import { PORTRAIT_ASPECT_RATIO, PORTRAIT_RENDER_PROFILE } from "./lib/render-profile";
 import { ScoreRenderer } from "./lib/score-renderer";
@@ -70,8 +77,11 @@ export default function App() {
   const [measuresPerSystem, setMeasuresPerSystem] = useState(PORTRAIT_RENDER_PROFILE.measuresPerSystem);
   const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>("color");
   const [backgroundColor, setBackgroundColor] = useState("#000000");
-  const [maskBlackMixPercent, setMaskBlackMixPercent] = useState(0);
+  const [maskBlackMixPercent, setMaskBlackMixPercent] = useState(10);
   const [paperTransparencyPercent, setPaperTransparencyPercent] = useState(0);
+  const [performanceEffectMode, setPerformanceEffectMode] = useState<PerformanceEffectMode>("mask");
+  const [performanceMixColor, setPerformanceMixColor] = useState("#1CAEE8");
+  const [performanceMixPercent, setPerformanceMixPercent] = useState(35);
   const [selectedBackgroundIndex, setSelectedBackgroundIndex] = useState(0);
   const [backgroundImageUrl, setBackgroundImageUrl] = useState<string | null>(null);
   const scoreHostRef = useRef<HTMLDivElement>(null);
@@ -82,6 +92,7 @@ export default function App() {
   const scoreTimelineLayerRef = useRef<ScoreTimelineLayer | null>(null);
   const scoreCameraRef = useRef<ScoreCamera | null>(null);
   const scoreMaskLayerRef = useRef<ScoreMaskLayer | null>(null);
+  const performanceEffectLayerRef = useRef<PerformanceEffectLayer | null>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
 
   const adoptProject = useCallback((nextProject: LoadedProject) => {
@@ -118,6 +129,13 @@ export default function App() {
   maskBlackMixPercentRef.current = maskBlackMixPercent;
   const paperTransparencyPercentRef = useRef(paperTransparencyPercent);
   paperTransparencyPercentRef.current = paperTransparencyPercent;
+  const performanceEffectConfig = useMemo<PerformanceEffectConfig>(() => ({
+    mode: performanceEffectMode,
+    mixColor: performanceMixColor,
+    mixAmount: performanceMixPercent / 100,
+  }), [performanceEffectMode, performanceMixColor, performanceMixPercent]);
+  const performanceEffectConfigRef = useRef(performanceEffectConfig);
+  performanceEffectConfigRef.current = performanceEffectConfig;
 
   useEffect(() => {
     const host = scoreHostRef.current;
@@ -131,6 +149,8 @@ export default function App() {
     scoreCameraRef.current = null;
     scoreMaskLayerRef.current?.dispose();
     scoreMaskLayerRef.current = null;
+    performanceEffectLayerRef.current?.dispose();
+    performanceEffectLayerRef.current = null;
     host.replaceChildren();
     setTargetCount(0);
     setStatus("正在排版 SVG 五线谱…");
@@ -153,6 +173,15 @@ export default function App() {
         scoreTimelineLayerRef.current = scoreTimelineLayer;
         const viewport = scoreViewportRef.current;
         if (viewport) {
+          const performanceEffectLayer = new PerformanceEffectLayer(viewport, viewport);
+          performanceEffectLayer.setVisuals(mergePerformanceVisuals(
+            rainLayer.performanceVisuals(),
+            scoreTimelineLayer.performanceVisuals(),
+          ));
+          performanceEffectLayer.setSource(maskSourceRef.current);
+          performanceEffectLayer.setConfig(performanceEffectConfigRef.current);
+          performanceEffectLayer.update();
+          performanceEffectLayerRef.current = performanceEffectLayer;
           const scoreMaskLayer = new ScoreMaskLayer(viewport, host);
           scoreMaskLayer.setElements(maskElements);
           scoreMaskLayer.setSource(maskSourceRef.current);
@@ -183,12 +212,19 @@ export default function App() {
       scoreCameraRef.current = null;
       scoreMaskLayerRef.current?.dispose();
       scoreMaskLayerRef.current = null;
+      performanceEffectLayerRef.current?.dispose();
+      performanceEffectLayerRef.current = null;
     };
   }, [project, measuresPerSystem]);
 
   useEffect(() => {
     scoreMaskLayerRef.current?.setSource(maskSource);
+    performanceEffectLayerRef.current?.setSource(maskSource);
   }, [maskSource]);
+
+  useEffect(() => {
+    performanceEffectLayerRef.current?.setConfig(performanceEffectConfig);
+  }, [performanceEffectConfig]);
 
   useEffect(() => {
     scoreMaskLayerRef.current?.setBlackMix(maskBlackMixPercent / 100);
@@ -202,6 +238,7 @@ export default function App() {
     rainLayerRef.current?.update(snapshot.sourceTimeMs);
     scoreTimelineLayerRef.current?.update(snapshot.sourceTimeMs);
     scoreCameraRef.current?.update(snapshot.scoreQuarter);
+    performanceEffectLayerRef.current?.update();
   }, [snapshot.scoreQuarter, snapshot.sourceTimeMs]);
 
   useEffect(() => {
@@ -387,6 +424,20 @@ export default function App() {
               </div>
             )}
           </div>
+
+          <label className="title-control">
+            <span className="step-label">TITLE</span>
+            <strong>画面标题</strong>
+            <input
+              type="text"
+              value={customTitle}
+              placeholder={project?.label ?? "等待素材"}
+              onChange={(event) => setCustomTitle(event.target.value)}
+              aria-label="画面标题"
+            />
+            <small>留空时使用素材原名称。</small>
+          </label>
+
           <div className="layout-control">
             <div className="layout-control-heading">
               <div>
@@ -404,7 +455,6 @@ export default function App() {
               value={measuresPerSystem}
               onChange={(event) => setMeasuresPerSystem(Number(event.target.value))}
             />
-            <p>乐谱按原尺寸的 2/3 显示，竖屏默认每行 2 个小节；首行自然排版，后续各行与首行栏线对齐。</p>
           </div>
 
           <div className="background-control">
@@ -481,22 +531,73 @@ export default function App() {
               />
               <output>{paperTransparencyPercent}%</output>
             </label>
-            <small>图片固定在画面中并居中裁切，以最短边撑满谱面视口。</small>
           </div>
 
-          <label className="title-control">
-            <span className="step-label">TITLE</span>
-            <strong>画面标题</strong>
-            <input
-              type="text"
-              value={customTitle}
-              placeholder={project?.label ?? "等待素材"}
-              onChange={(event) => setCustomTitle(event.target.value)}
-              aria-label="画面标题"
-            />
-            <small>留空时使用素材原名称。</small>
-          </label>
+          <div className="performance-effect-control">
+            <div>
+              <p className="step-label">PERFORMANCE EFFECT</p>
+              <strong>演奏元素效果</strong>
+            </div>
+            <div className="background-mode" aria-label="演奏元素效果模式">
+              <button
+                type="button"
+                aria-pressed={performanceEffectMode === "mask"}
+                onClick={() => setPerformanceEffectMode("mask")}
+              >
+                共用蒙版
+              </button>
+              <button
+                type="button"
+                aria-pressed={performanceEffectMode === "rainbow"}
+                onClick={() => setPerformanceEffectMode("rainbow")}
+              >
+                彩虹色
+              </button>
+            </div>
+            {performanceEffectMode === "mask" ? (
+              <>
+                <label className="color-control">
+                  <span>混入颜色</span>
+                  <input
+                    type="color"
+                    value={performanceMixColor}
+                    onChange={(event) => setPerformanceMixColor(event.target.value)}
+                    aria-label="演奏元素混入颜色"
+                  />
+                  <output>{performanceMixColor.toUpperCase()}</output>
+                </label>
+                <label className="performance-mix-control">
+                  <span>混入强度</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={performanceMixPercent}
+                    onChange={(event) => setPerformanceMixPercent(Number(event.target.value))}
+                    aria-label="演奏元素混入强度"
+                  />
+                  <output>{performanceMixPercent}%</output>
+                </label>
+                <small>与谱面共用同一背景源和固定裁切位置，仅单独叠加所选颜色。</small>
+              </>
+            ) : (
+              <>
+                <div className="performance-palette" aria-label="C D E F G A B 彩虹配色">
+                  {Object.entries(PERFORMANCE_RAINBOW_PALETTE).map(([step, color]) => (
+                    <span key={step} style={{ "--performance-color": color } as CSSProperties}>
+                      {step}
+                    </span>
+                  ))}
+                </div>
+                <small>音头按书写音名着色；和弦符杆取远端音，连梁与无音高元素使用渐变。</small>
+              </>
+            )}
+          </div>
 
+        </aside>
+
+        <aside className="playback-panel">
           <div className="sidebar-transport" aria-label="播放控制">
             <audio ref={audioRef} aria-label="乐谱音频" />
             <div className="sidebar-transport-heading">

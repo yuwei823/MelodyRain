@@ -1,4 +1,9 @@
 import type { MidiTimeline } from "./midi";
+import {
+  FULL_RAINBOW_STOPS,
+  PERFORMANCE_RAINBOW_PALETTE,
+  type PerformanceVisuals,
+} from "./performance-effect-layer";
 import type { TimedScoreElement, TimedScoreSpan, TimedTieContinuation } from "./score-renderer";
 
 export const SCORE_REVEAL_DURATION_MS = 300;
@@ -26,6 +31,8 @@ interface RenderedSpan {
   element: SVGGraphicsElement;
   startMs: number;
   endMs: number;
+  startColor?: string;
+  endColor?: string;
 }
 
 interface RenderedTieContinuation {
@@ -51,10 +58,12 @@ export class ScoreTimelineLayer {
       element,
       triggerMs: this.timeline.timeAtScoreQuarter(scoreQuarter),
     }));
-    this.spans = spans.map(({ element, startQuarter, endQuarter }) => ({
+    this.spans = spans.map(({ element, startQuarter, endQuarter, startPitchStep, endPitchStep }) => ({
       element,
       startMs: this.timeline.timeAtScoreQuarter(startQuarter),
       endMs: this.timeline.timeAtScoreQuarter(endQuarter),
+      startColor: startPitchStep ? PERFORMANCE_RAINBOW_PALETTE[startPitchStep] : undefined,
+      endColor: endPitchStep ? PERFORMANCE_RAINBOW_PALETTE[endPitchStep] : undefined,
     }));
     this.tieContinuations = tieContinuations.map(({ elements, scoreQuarter, staffIndex }) => ({
       elements,
@@ -107,6 +116,35 @@ export class ScoreTimelineLayer {
         element.classList.toggle("is-sustained", isVisible);
       });
     });
+  }
+
+  performanceVisuals(): PerformanceVisuals {
+    return {
+      maskElements: [
+        ...this.reveals.map(({ element }) => element),
+        ...this.spans.map(({ element }) => element),
+        ...this.tieContinuations.flatMap(({ elements }) => elements),
+      ],
+      paints: [
+        ...this.reveals.map(({ element }) => ({
+          element,
+          paint: { kind: "gradient" as const, stops: FULL_RAINBOW_STOPS.map((stop) => ({ ...stop })) },
+        })),
+        ...this.spans.map(({ element, startColor, endColor }) => ({
+          element,
+          paint: {
+            kind: "gradient" as const,
+            stops: startColor && endColor
+              ? [{ offset: 0, color: startColor }, { offset: 1, color: endColor }]
+              : FULL_RAINBOW_STOPS.map((stop) => ({ ...stop })),
+          },
+        })),
+        ...this.tieContinuations.flatMap(({ elements }) => elements.map((element) => ({
+          element,
+          paint: { kind: "gradient" as const, stops: FULL_RAINBOW_STOPS.map((stop) => ({ ...stop })) },
+        }))),
+      ],
+    };
   }
 
   dispose(): void {

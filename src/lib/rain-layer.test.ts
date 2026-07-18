@@ -20,7 +20,18 @@ function event(id: string, midi: number, scoreQuarter: number, attackMs: number)
 }
 
 function target(id: string, pitchMidi: number, scoreQuarter: number, staffIndex: number, x: number, y: number): ScoreTarget {
-  return { id, pitchMidi, scoreQuarter, staffIndex, x, y, width: 12, height: 8 };
+  return {
+    id,
+    pitchMidi,
+    pitchStep: "C",
+    stemDirection: "up",
+    scoreQuarter,
+    staffIndex,
+    x,
+    y,
+    width: 12,
+    height: 8,
+  };
 }
 
 describe("rain chord mapping", () => {

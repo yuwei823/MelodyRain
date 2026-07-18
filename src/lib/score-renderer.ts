@@ -1,17 +1,25 @@
 import { OpenSheetMusicDisplay } from "opensheetmusicdisplay";
 import { applyMeasuresPerSystem } from "./score-layout";
+import {
+  pitchStepFromFundamentalNote,
+  type PitchStep,
+  type StemDirection,
+} from "./performance-effect-layer";
 import { collectVisibleScoreMaskElements } from "./score-mask-layer";
 
 export interface ScoreTarget {
   id: string;
   scoreQuarter: number;
   pitchMidi: number;
+  pitchStep: PitchStep;
+  stemDirection: StemDirection;
   staffIndex: number;
   x: number;
   y: number;
   width: number;
   height: number;
   stem?: ScoreSymbolBounds;
+  noteheadElement?: SVGGraphicsElement;
   notation?: ScoreNotation;
   tieContinuation?: boolean;
 }
@@ -26,6 +34,7 @@ export interface ScoreSymbolBounds {
 export interface ScoreNotation {
   noteElement: SVGGraphicsElement;
   attachedElements: SVGGraphicsElement[];
+  stemElement?: SVGGraphicsElement;
   beamElements: SVGGraphicsElement[];
 }
 
@@ -48,6 +57,8 @@ export interface TimedScoreSpan {
   element: SVGGraphicsElement;
   startQuarter: number;
   endQuarter: number;
+  startPitchStep?: PitchStep;
+  endPitchStep?: PitchStep;
 }
 
 export interface TimedTieContinuation {
@@ -191,12 +202,17 @@ export class ScoreRenderer {
               scoreQuarter,
               // OSMD numbers C4 as 48, while MIDI numbers C4 as 60.
               pitchMidi: note.sourceNote.Pitch.getHalfTone() + 12,
+              pitchStep: pitchStepFromFundamentalNote(note.sourceNote.Pitch.FundamentalNote),
+              stemDirection: note.sourceNote.ParentVoiceEntry.StemDirection === 1
+                ? "down"
+                : note.sourceNote.ParentVoiceEntry.StemDirection === 0 ? "up" : "none",
               staffIndex,
               x: notehead?.x ?? point.x,
               y: notehead?.y ?? point.y,
               width: notehead?.width ?? 12,
               height: notehead?.height ?? 8,
               stem: stem?.bounds,
+              noteheadElement: notehead?.element as SVGGraphicsElement | undefined,
               notation,
               tieContinuation: Boolean(tie && tie.Notes.indexOf(note.sourceNote) > 0),
             });
@@ -224,6 +240,7 @@ export class ScoreRenderer {
       const attachedElements = typeof note.getLedgerLineSVGs === "function"
         ? note.getLedgerLineSVGs().filter(Boolean) as unknown as SVGGraphicsElement[]
         : [];
+      let stemElement: SVGGraphicsElement | undefined;
       const siblingLedgerGroup = noteElement.parentElement?.querySelector<SVGGraphicsElement>(
         `[id="${noteElement.id}ledgers"]`,
       );
@@ -237,9 +254,10 @@ export class ScoreRenderer {
         const stemGroup = stemPath?.parentElement?.matches("g.vf-stem")
           ? stemPath.parentElement as unknown as SVGGraphicsElement
           : stemPath;
+        stemElement = stemGroup;
         if (stemGroup && !noteElement.contains(stemGroup)) attachedElements.push(stemGroup);
       }
-      return { noteElement, attachedElements, beamElements: [] };
+      return { noteElement, attachedElements, stemElement, beamElements: [] };
     } catch {
       return undefined;
     }
@@ -339,7 +357,13 @@ export class ScoreRenderer {
       const endQuarter = end && end.scoreQuarter > start.scoreQuarter
         ? end.scoreQuarter
         : start.scoreQuarter + Math.max(0.25, this.nextTargetQuarter(candidates, start.scoreQuarter));
-      return [{ element, startQuarter: start.scoreQuarter, endQuarter }];
+      return [{
+        element,
+        startQuarter: start.scoreQuarter,
+        endQuarter,
+        startPitchStep: start.pitchStep,
+        endPitchStep: end?.pitchStep ?? start.pitchStep,
+      }];
     });
 
     return { revealElements: reveals, growingSpans: spans };

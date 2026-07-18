@@ -1,4 +1,12 @@
 import type { MidiNoteEvent, MidiTimeline } from "./midi";
+import {
+  FULL_RAINBOW_STOPS,
+  PERFORMANCE_RAINBOW_PALETTE,
+  normalizedGradientStops,
+  stemOwnerTarget,
+  type PerformancePaintAssignment,
+  type PerformanceVisuals,
+} from "./performance-effect-layer";
 import type { ScoreTarget, TimedRainSymbol } from "./score-renderer";
 
 export interface RainChord {
@@ -12,6 +20,7 @@ export interface RainChord {
 interface RenderedRainSymbol {
   attackMs: number;
   elements: SVGGraphicsElement[];
+  paints: PerformancePaintAssignment[];
 }
 
 const FALL_DURATION_MS = 1_200;
@@ -194,6 +203,13 @@ export class RainLayer {
     this.symbols = [];
   }
 
+  performanceVisuals(): PerformanceVisuals {
+    return {
+      maskElements: [...new Set(this.symbols.flatMap((symbol) => symbol.elements))],
+      paints: this.symbols.flatMap((symbol) => symbol.paints),
+    };
+  }
+
   private renderChord(chord: RainChord): RenderedRainSymbol {
     const elements = new Set<SVGGraphicsElement>();
     chord.targets.forEach((target) => {
@@ -202,22 +218,84 @@ export class RainLayer {
       target.notation.attachedElements.forEach((element) => elements.add(element));
       target.notation.beamElements.forEach((element) => elements.add(element));
     });
-
-    return this.prepareSymbol(chord.attackMs, [...elements], chord.targets[0]?.staffIndex ?? 0);
+    const paints = this.chordPaints(chord);
+    return this.prepareSymbol(chord.attackMs, [...elements], chord.targets[0]?.staffIndex ?? 0, paints);
   }
 
   private renderRest(rest: TimedRainSymbol): RenderedRainSymbol {
-    return this.prepareSymbol(this.timeline.timeAtScoreQuarter(rest.scoreQuarter), rest.elements, rest.staffIndex);
+    return this.prepareSymbol(
+      this.timeline.timeAtScoreQuarter(rest.scoreQuarter),
+      rest.elements,
+      rest.staffIndex,
+      rest.elements.map((element) => ({
+        element,
+        paint: { kind: "gradient", stops: FULL_RAINBOW_STOPS.map((stop) => ({ ...stop })) },
+      })),
+    );
   }
 
-  private prepareSymbol(attackMs: number, elements: SVGGraphicsElement[], staffIndex: number): RenderedRainSymbol {
+  private prepareSymbol(
+    attackMs: number,
+    elements: SVGGraphicsElement[],
+    staffIndex: number,
+    paints: PerformancePaintAssignment[],
+  ): RenderedRainSymbol {
     const staffClass = this.staffClassForElements(elements, staffIndex);
     elements.forEach((element) => {
       element.classList.add("rain-score-symbol", staffClass);
       element.style.visibility = "hidden";
     });
 
-    return { attackMs, elements: [...new Set(elements)] };
+    return { attackMs, elements: [...new Set(elements)], paints };
+  }
+
+  private chordPaints(chord: RainChord): PerformancePaintAssignment[] {
+    const paints: PerformancePaintAssignment[] = [];
+    const notationGroups = new Map<SVGGraphicsElement, ScoreTarget[]>();
+    chord.targets.forEach((target) => {
+      const noteElement = target.notation?.noteElement;
+      if (!noteElement) return;
+      const group = notationGroups.get(noteElement) ?? [];
+      group.push(target);
+      notationGroups.set(noteElement, group);
+    });
+
+    notationGroups.forEach((targets, noteElement) => {
+      const owner = stemOwnerTarget(targets) ?? targets[0]!;
+      const ownerColor = PERFORMANCE_RAINBOW_PALETTE[owner.pitchStep];
+      paints.push({ element: noteElement, paint: { kind: "solid", color: ownerColor } });
+      targets.forEach((target) => {
+        const color = PERFORMANCE_RAINBOW_PALETTE[target.pitchStep];
+        if (target.noteheadElement) paints.push({ element: target.noteheadElement, paint: { kind: "solid", color } });
+        target.notation?.attachedElements
+          .filter((element) => element !== target.notation?.stemElement)
+          .forEach((element) => paints.push({ element, paint: { kind: "solid", color } }));
+      });
+      const stems = new Set(targets.map((target) => target.notation?.stemElement).filter(Boolean));
+      stems.forEach((element) => paints.push({
+        element: element!,
+        paint: { kind: "solid", color: ownerColor },
+      }));
+    });
+
+    const beams = new Set(chord.targets.flatMap((target) => target.notation?.beamElements ?? []));
+    beams.forEach((beam) => {
+      const connected = chord.targets.filter((target) => target.notation?.beamElements.includes(beam));
+      const connectedGroups = new Map<SVGGraphicsElement, ScoreTarget[]>();
+      connected.forEach((target) => {
+        const noteElement = target.notation?.noteElement;
+        if (!noteElement) return;
+        const group = connectedGroups.get(noteElement) ?? [];
+        group.push(target);
+        connectedGroups.set(noteElement, group);
+      });
+      const stops = normalizedGradientStops([...connectedGroups.values()].map((targets) => {
+        const owner = stemOwnerTarget(targets) ?? targets[0]!;
+        return { position: owner.x, color: PERFORMANCE_RAINBOW_PALETTE[owner.pitchStep] };
+      }));
+      paints.push({ element: beam, paint: { kind: "gradient", stops } });
+    });
+    return paints;
   }
 
   /**
