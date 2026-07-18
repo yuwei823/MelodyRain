@@ -142,6 +142,9 @@ button { color: inherit; }
 .rain-score-symbol.is-hit { animation: rain-hit-pulse 200ms ease-out; }
 .score-reveal-symbol { pointer-events: none; will-change: opacity; }
 .score-growing-span { pointer-events: none; will-change: clip-path; }
+.score-stroke-growing-span { will-change: auto; }
+.score-stroke-growing-span :is(path, line, polyline, polygon),
+.score-stroke-growing-span:is(path, line, polyline, polygon) { will-change: stroke-dashoffset; }
 @keyframes rain-hit-pulse {
   0% { filter: brightness(1.15) saturate(1.15) drop-shadow(0 0 2px currentColor); }
   45% { filter: brightness(1.45) saturate(1.3) drop-shadow(0 0 4px currentColor); }
