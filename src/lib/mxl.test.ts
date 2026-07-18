@@ -36,4 +36,23 @@ describe("MXL parser", () => {
   it("rejects data that is not a ZIP/MXL container", () => {
     expect(() => extractMusicXml(new TextEncoder().encode("not a zip").buffer)).toThrow(/MXL\/ZIP/);
   });
+
+  it("rejects suspicious compression ratios before extracting the archive", () => {
+    const archive = zipSync({
+      "META-INF/container.xml": strToU8("x".repeat(1024 * 1024)),
+    }, { level: 9 });
+    const buffer = archive.buffer.slice(archive.byteOffset, archive.byteOffset + archive.byteLength) as ArrayBuffer;
+
+    expect(() => extractMusicXml(buffer)).toThrow("压缩比");
+  });
+
+  it("rejects archives with too many entries", () => {
+    const entries = Object.fromEntries(
+      Array.from({ length: 129 }, (_, index) => [`entry-${index}.txt`, new Uint8Array()]),
+    );
+    const archive = zipSync(entries);
+    const buffer = archive.buffer.slice(archive.byteOffset, archive.byteOffset + archive.byteLength) as ArrayBuffer;
+
+    expect(() => extractMusicXml(buffer)).toThrow("128");
+  });
 });

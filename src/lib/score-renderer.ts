@@ -1,4 +1,10 @@
 import type { OpenSheetMusicDisplay } from "opensheetmusicdisplay";
+import {
+  OSMD_MEASURE_SELECTOR,
+  OSMD_STAFF_LINE_SELECTOR,
+  osmdOwnerSelector,
+  type OsmdSvgBackedGraphicalNote,
+} from "./osmd-compat";
 import { applyMeasuresPerSystem } from "./score-layout";
 import {
   pitchStepFromFundamentalNote,
@@ -70,13 +76,6 @@ export interface ScoreRenderResult {
   maskElements: SVGGraphicsElement[];
 }
 
-interface SvgBackedGraphicalNote {
-  getNoteheadSVGs(): HTMLElement[];
-  getStemSVG(): HTMLElement;
-  getVFNoteSVG(): HTMLElement;
-  getLedgerLineSVGs(): HTMLElement[];
-}
-
 export class ScoreRenderer {
   private osmd: OpenSheetMusicDisplay | null = null;
   private osmdPromise: Promise<OpenSheetMusicDisplay> | null = null;
@@ -135,16 +134,16 @@ export class ScoreRenderer {
 
   private matchMeasureWidthsToFirstSystem(): boolean {
     const osmd = this.requireOsmd();
-    const staffLines = [...this.container.querySelectorAll<SVGGElement>(".staffline")];
+    const staffLines = [...this.container.querySelectorAll<SVGGElement>(OSMD_STAFF_LINE_SELECTOR)];
     const referenceStaffLine = staffLines[0];
     if (!referenceStaffLine) return false;
 
-    const referenceMeasures = [...referenceStaffLine.querySelectorAll<SVGGElement>(":scope > .vf-measure")];
+    const referenceMeasures = [...referenceStaffLine.querySelectorAll<SVGGElement>(`:scope > ${OSMD_MEASURE_SELECTOR}`)];
     const systemStaffLines = staffLines.filter((staffLine) => staffLine.id === referenceStaffLine.id);
     let changed = false;
 
     for (const staffLine of systemStaffLines.slice(1)) {
-      const measures = [...staffLine.querySelectorAll<SVGGElement>(":scope > .vf-measure")];
+      const measures = [...staffLine.querySelectorAll<SVGGElement>(`:scope > ${OSMD_MEASURE_SELECTOR}`)];
 
       measures.forEach((measure, index) => {
         const source = measure.getBBox();
@@ -178,7 +177,7 @@ export class ScoreRenderer {
         for (const voiceEntry of staffEntry.graphicalVoiceEntries) {
           for (const note of voiceEntry.notes) {
             const point = osmd.GraphicSheet.svgToDom(note.PositionAndShape.AbsolutePosition);
-            const svgNote = note as unknown as SvgBackedGraphicalNote;
+            const svgNote = note as unknown as OsmdSvgBackedGraphicalNote;
             const notehead = this.findNotehead(svgNote, point, hostBounds);
             const stem = this.findStem(svgNote, hostBounds);
             const notation = this.findNotation(svgNote);
@@ -238,7 +237,7 @@ export class ScoreRenderer {
     return { targets, restSymbols: [...restSymbols.values()] };
   }
 
-  private findNotation(note: SvgBackedGraphicalNote): ScoreNotation | undefined {
+  private findNotation(note: OsmdSvgBackedGraphicalNote): ScoreNotation | undefined {
     if (typeof note.getVFNoteSVG !== "function") return undefined;
 
     try {
@@ -387,7 +386,7 @@ export class ScoreRenderer {
     targets: ScoreTarget[],
     scope: "measure" | "system" = "measure",
   ): ScoreTarget[] {
-    const selector = scope === "system" ? ".staffline" : ".vf-measure";
+    const selector = osmdOwnerSelector(scope);
     const owner = element.closest(selector);
     if (!owner) return targets;
     return targets.filter((target) => target.notation?.noteElement.closest(selector) === owner);
@@ -409,7 +408,7 @@ export class ScoreRenderer {
   }
 
   private findNotehead(
-    note: SvgBackedGraphicalNote,
+    note: OsmdSvgBackedGraphicalNote,
     fallback: { x: number; y: number },
     hostBounds: DOMRect,
   ): { element: HTMLElement; x: number; y: number; width: number; height: number } | undefined {
@@ -439,7 +438,7 @@ export class ScoreRenderer {
   }
 
   private findStem(
-    note: SvgBackedGraphicalNote,
+    note: OsmdSvgBackedGraphicalNote,
     hostBounds: DOMRect,
   ): { element: HTMLElement; bounds: ScoreSymbolBounds } | undefined {
     if (typeof note.getStemSVG !== "function") return undefined;

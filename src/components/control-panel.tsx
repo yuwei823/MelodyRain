@@ -5,9 +5,8 @@ import {
   type PerformanceEffectMode,
 } from "../lib/performance-effect-layer";
 import type { LoadedProject } from "../hooks/use-project-loader";
+import type { BackgroundMode } from "../lib/project-settings";
 import type { TitleColorMode } from "../lib/title-color";
-
-export type BackgroundMode = "image" | "color";
 
 interface ControlPanelProps {
   project: LoadedProject | null;

@@ -1,10 +1,10 @@
 # MelodyRain 产品与技术规格说明书
 
-**版本：** v0.1.1
+**版本：** v0.1.3
 **状态：** Draft  
 **日期：** 2026-07-18
 **示例来源：** https://musescore.com/user/28854994/scores/11566147  
-**MVP-1 目标：** 在本地网页应用中导入用户预先下载的 MusicXML 与 MIDI，生成可播放五线谱和带同步音乐的竖屏动画视频。
+**当前目标：** 先交付可稳定载入本地素材并同步播放动画的 Preview MVP，再依次完成 Alignment MVP 与 Deterministic Export MVP。
 
 ---
 
@@ -1178,45 +1178,44 @@ MVP 至少维护以下自有或可合法再分发的固定测试谱：
 
 ---
 
-## 12. MVP-1 里程碑
+## 12. 分阶段交付路线
 
-### M1：本地导入与标准化
+本节取代旧的单一 MVP-1 里程碑定义。前文标注 “MVP-1” 的需求按下列交付门归属；未达到当前阶段门槛的能力不得在产品状态中宣称已完成。
 
-- 本地网页应用骨架；
-- MusicXML/MIDI 文件选择与安全校验；
-- MusicXML/MIDI 解析；
-- 统一事件模型与诊断报告。
+### Phase 1：Preview MVP
 
-### M2：可播放五线谱
+目标是稳定、可诊断的浏览器竖屏预览，不包含正式视频输出。
 
-- SVG 乐谱渲染；
-- 离线音频合成；
-- 播放器；
-- 小节与音符高亮；
-- 坐标映射。
-- 1080×1920 竖屏 RenderProfile；
-- 每行小节数控制、实时排版预览和拥挤检测。
+- 本地文件夹导入、MXL 安全校验、MusicXML/MIDI/MP3 解析；
+- OSMD SVG 排版、单一竖屏 RenderProfile、每行小节数控制；
+- 单一 Transport 驱动播放、跳转、变速、谱面相机和动画；
+- `rainDrop`、记谱元素时序、蒙版/彩虹效果与项目设置；
+- 设置版本迁移、错误提示、核心单元/集成测试和真实 MusicXML 的 OSMD 兼容回归。
 
-### M3：基础动画
+退出条件：样例和固定测试谱可反复载入、播放、跳转和切换设置；项目切换无状态串扰；不存在已知高风险文件解析问题。
 
-- 音符下落；
-- `rainDrop` 统一入场接口；
-- 和弦与跨谱表；
-- 完整 `NoteVisualGroup`：符头、符干、符尾、附点、升降号、加线、modifier 与共享 beam；
-- 跨音符连接符随节奏从左向右生长；
-- 小节编号、速度、力度、发夹及其他说明元素按谱面时间执行 300 ms 渐显；
-- 全局 `glow` 和按谱表 `colorize`；
-- 原始完整记谱单元隐藏、雨滴命中后停留；
-- 多系统纵向滑动和超长小节横向滚动；
-- reduced motion。
+### Phase 2：Alignment MVP
 
-### M4：离线视频与质量门禁
+目标是证明 MusicXML、MIDI 与音频来源一致且映射质量足以进入正式导出。
 
-- 确定性逐帧渲染；
-- FFmpeg 输出；
-- A/V 同步测试；
-- 质量报告；
-- 示例乐谱端到端验收。
+- 建立稳定的 ScoreEvent/PerformanceEvent 标识与反复展开模型；
+- 计算匹配率、首批差异位置和来源版本诊断；
+- 提供人工复核/校正入口与低置信度门禁；
+- 生成可持久化的对齐报告、源文件哈希与布局映射。
+
+退出条件：测试资产矩阵全部产生可解释的对齐结果，低于门槛的项目无法进入导出阶段。
+
+### Phase 3：Deterministic Export MVP
+
+目标是根据绝对时间确定性地产生正式竖屏视频。
+
+- 帧时间由 `frameIndex / fps` 唯一决定，预览和导出消费同一时间索引；
+- 固定版本 SoundFont/合成器生成音轨，FFmpeg 使用参数数组封装；
+- 支持导出小节区间、预卷、任务进度、取消和恢复；
+- 执行布局碰撞、A/V 同步、确定性与质量报告门禁；
+- 输出 1080×1920 H.264/AAC MP4，并通过端到端重复导出验收。
+
+退出条件：相同输入、设置、依赖与音源连续导出产生相同事件命中帧，并满足 NFR-01 与质量报告要求。
 
 ---
 
@@ -1257,3 +1256,67 @@ MVP 至少维护以下自有或可合法再分发的固定测试谱：
 - [Udio Audio Upload](https://help.udio.com/en/articles/10754328-create-music-with-your-own-audio)和 [Suno Audio Upload](https://help.suno.com/en/articles/6141569)面向音频的 remix、style、extend 等再创作；[AIVA](https://www.aiva.ai/legal/1)可把 MIDI/Audio 作为 influence 生成新的 MIDI/Audio。它们可能改变作品结构，因此只列为重新对齐后的创作分支；
 - OSMD 的音频播放器不作为 MVP 核心依赖，音频由独立离线合成链生成；
 - 示例 MuseScore 页面当前展示为钢琴独奏乐谱，但平台内容与下载权限可能变化。
+
+---
+
+## 15. 当前实现基线与规格差距（2026-07-18）
+
+本章记录仓库当前可运行代码的事实状态，用于区分“已经实现”和前述章节中的 MVP-1 目标态。发生冲突时，本章描述当前实现，前述功能需求仍作为目标与验收方向。
+
+### 15.1 已实现能力
+
+- 浏览器端选择本地素材文件夹，按同名 stem 匹配一组 MXL/MusicXML、MIDI 与 MP3；三类素材各只有一个候选时允许文件名不同；支持 PNG、JPEG、WebP、AVIF 背景。
+- 支持记住 File System Access API 目录句柄；有权限时刷新后重新读取。其他浏览器使用 `webkitdirectory` 选择和 JSON 下载回退。
+- MXL 读取会验证 ZIP 签名、归档路径、20 MB 解压后总大小、`META-INF/container.xml` 与 MusicXML 根元素；XML 解析禁用实体处理并拒绝自定义实体声明。
+- OSMD 将 MusicXML 渲染为 SVG；当前支持每行 1 至 6 小节、固定 9:16 竖屏 profile、连续纵向谱面相机。
+- MIDI tempo map、MP3 播放、进度跳转、0.5×/0.75×/1× 变速、1.2 秒动画预卷由单个 `MediaTransport` 驱动。
+- 已实现音符/和弦/休止符下落与命中、部分跨音符连接和谱面说明元素的时间效果、静态谱面背景蒙版，以及共享蒙版和彩虹两种演奏元素效果。
+- 支持标题及自动/自定义标题颜色、背景图片/纯色、蒙版黑色混入、谱纸透明度、演奏元素混色，并可保存和读取项目设置。
+- 本地 Express 服务监听 `127.0.0.1`，提供静态网页、健康检查和演示资源 API；当前不承担渲染任务。
+
+### 15.2 设置文件契约
+
+设置文件名固定为 `melody-rain.settings.json`，当前格式版本为 `2`。保存操作总是输出当前版本；读取时先迁移再校验。
+
+| 字段 | v2 类型/范围 | 说明 |
+|---|---|---|
+| `version` | `2` | 当前格式版本 |
+| `title` | string | 自定义标题，允许空字符串 |
+| `titleColor` | `#RRGGBB` | 标题颜色 |
+| `titleColorMode` | `auto` / `custom` | 自动对比色或自定义颜色 |
+| `measuresPerSystem` | integer, 1–6 | 每行小节数 |
+| `backgroundMode` | `image` / `color` | 背景来源 |
+| `backgroundColor` | `#RRGGBB` | 纯色背景 |
+| `backgroundImageFile` | string / null | 背景图片文件名 |
+| `maskBlackMixPercent` | 0–100 | 静态谱面蒙版黑色混入 |
+| `paperTransparencyPercent` | 0–100 | 谱纸透明度 |
+| `performanceEffectMode` | `mask` / `rainbow` | 演奏元素效果 |
+| `performanceMixColor` | `#RRGGBB` | 演奏蒙版混色 |
+| `performanceMixPercent` | 0–100 | 演奏蒙版混色比例 |
+
+v1 → v2 迁移新增 `titleColor` 与 `titleColorMode`。旧文件缺少字段时分别使用 `#25364A` 和 `auto`；若旧文件已经包含合法值则保留。缺少有效版本号、低于 v1、或高于当前版本的文件拒绝读取。百分数字段读取时取整并钳制至 0–100，随后继续执行字段范围校验。
+
+### 15.3 尚未实现的目标态能力
+
+- 没有 MP4/FFmpeg 离线视频导出、逐帧确定性渲染、导出区间、渲染任务队列、取消或进度 API。
+- 没有 FluidSynth/SoundFont 离线音频合成；预览直接播放用户提供的 MP3，浏览器变速能力依赖媒体元素。
+- 没有 MusicXML/MIDI 来源版本验证、正式对齐置信度、人工校正、低匹配率导出门禁或 `quality-report.json`。
+- 没有源文件哈希、布局碰撞检测、可读性门禁、多 profile 导出或横屏布局。
+- 没有将任务状态、解析中间产物或渲染产物持久化；IndexedDB 当前只保存最近目录句柄。
+- 服务端演示 API 不属于核心加载路径；生产预览主要由浏览器读取用户授权的本地文件。
+
+### 15.4 当前验证基线
+
+- TypeScript 启用 `strict`、`noUncheckedIndexedAccess`、`noUnusedLocals` 与 `noUnusedParameters`。
+- 自动化测试覆盖素材匹配、MXL/MIDI 解析、设置迁移、Transport、相机、布局目标、谱面净化、雨滴、时间层、蒙版和演奏效果核心逻辑。
+- 截至本章日期，仓库测试基线为 15 个测试文件、58 项测试；类型检查和生产构建应作为每次发布的最低门禁。
+
+### 15.5 当前前端职责边界
+
+- `useProjectLoader`：目录权限、素材匹配、文件解析、设置文件读写和异步请求淘汰；
+- `useProjectVisualSettings`：视觉参数默认值、项目切换重置、设置应用、背景 URL 与标题对比色；
+- `useScoreStage`：OSMD 排版以及雨滴、时间层、相机、静态蒙版和演奏效果层生命周期；
+- `useMediaTransport`：音频元素、唯一 Transport、UI 快照节流和活动 MIDI 音符；
+- `App`：组合上述 controller/hook，并把状态和操作传递给展示组件。
+
+OSMD 固定为 `2.0.0`。所有依赖 OSMD/VexFlow SVG DOM 的选择器和结构类型必须通过 `osmd-compat.ts` 暴露；升级 OSMD 前必须先通过真实 MusicXML 集成回归。

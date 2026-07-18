@@ -1,4 +1,5 @@
 import type { MidiNoteEvent, MidiTimeline } from "./midi";
+import { OSMD_STAFF_LINE_SELECTOR } from "./osmd-compat";
 import {
   FULL_RAINBOW_STOPS,
   PERFORMANCE_RAINBOW_PALETTE,
@@ -330,7 +331,7 @@ export class RainLayer {
    */
   private staffClassForElements(elements: SVGGraphicsElement[], fallbackIndex: number): string {
     const staffId = elements
-      .map((element) => element.closest(".staffline")?.id)
+      .map((element) => element.closest(OSMD_STAFF_LINE_SELECTOR)?.id)
       .find(Boolean);
     const match = staffId?.match(/-(\d+)$/);
     const index = match ? Number(match[1]) - 1 : fallbackIndex;

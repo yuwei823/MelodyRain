@@ -85,6 +85,7 @@ export function useProjectLoader({ onProjectLoaded, onSettingsLoaded }: UseProje
           settingsError = caught instanceof Error ? caught.message : String(caught);
         }
       }
+      if (requestId !== loadRequestRef.current) return;
 
       adoptProject({
         label: assets.score.name,

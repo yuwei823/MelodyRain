@@ -2,6 +2,7 @@
 
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ScoreRenderer } from "./score-renderer";
+import { OSMD_MEASURE_SELECTOR, OSMD_STAFF_LINE_SELECTOR } from "./osmd-compat";
 
 const PIANO_WITH_LEDGER_LINES = `<score-partwise version="4.0">
   <work><work-title>ScoreRenderer integration fixture</work-title></work>
@@ -141,6 +142,8 @@ describe("ScoreRenderer MusicXML integration", () => {
     const result = await new ScoreRenderer(host).render(PIANO_WITH_LEDGER_LINES, 1);
 
     expect(host.querySelector("svg")).not.toBeNull();
+    expect(host.querySelectorAll(OSMD_STAFF_LINE_SELECTOR).length).toBeGreaterThanOrEqual(2);
+    expect(host.querySelectorAll(OSMD_MEASURE_SELECTOR).length).toBeGreaterThanOrEqual(2);
     expect(host.querySelectorAll(".vf-clef").length).toBeGreaterThanOrEqual(2);
     expect(result.targets.map(({ pitchMidi }) => pitchMidi).sort((a, b) => a - b))
       .toEqual([36, 79, 81, 96]);

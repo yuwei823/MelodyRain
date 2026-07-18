@@ -1,9 +1,9 @@
-import type { BackgroundMode } from "../components/control-panel";
 import type { PerformanceEffectMode } from "./performance-effect-layer";
 import { DARK_TITLE_COLOR, type TitleColorMode } from "./title-color";
 
 export const PROJECT_SETTINGS_FILE_NAME = "melody-rain.settings.json";
 export const PROJECT_SETTINGS_VERSION = 2 as const;
+export type BackgroundMode = "image" | "color";
 
 export interface ProjectSettings {
   version: typeof PROJECT_SETTINGS_VERSION;

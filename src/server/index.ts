@@ -1,11 +1,13 @@
 import cors from "cors";
 import express from "express";
 import path from "node:path";
+import { readAppVersion } from "./app-version.js";
 
 const host = "127.0.0.1";
 const port = Number(process.env.MELODY_RAIN_PORT ?? 4174);
 const projectRoot = process.cwd();
-const demoRoot = path.join(projectRoot, "ode-to-joy");
+const appVersion = readAppVersion(projectRoot);
+const demoRoot = path.join(projectRoot, "sample/ode-to-joy");
 const webRoot = path.join(projectRoot, "dist");
 
 const demoAssets = {
@@ -23,8 +25,8 @@ app.use(
 );
 
 app.get("/api/health", (_request, response) => {
-  response.json({ status: "ok", service: "melody-rain-local", version: "0.1.0" });
-});
+  response.json({ status: "ok", service: "melody-rain-local", version: appVersion });
+1});
 
 app.get("/api/demo/manifest", (_request, response) => {
   response.json({

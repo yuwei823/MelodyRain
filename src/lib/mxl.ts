@@ -11,6 +11,12 @@ const xmlParser = new XMLParser({
 });
 
 const MAX_UNCOMPRESSED_BYTES = 20 * 1024 * 1024;
+const MAX_ARCHIVE_BYTES = 25 * 1024 * 1024;
+const MAX_ARCHIVE_FILES = 128;
+const MAX_SINGLE_FILE_BYTES = 16 * 1024 * 1024;
+const MAX_COMPRESSION_RATIO = 200;
+const END_OF_CENTRAL_DIRECTORY_SIGNATURE = 0x06054b50;
+const CENTRAL_DIRECTORY_FILE_SIGNATURE = 0x02014b50;
 
 type XmlRecord = Record<string, unknown>;
 
@@ -45,6 +51,60 @@ function validateArchivePath(path: string): void {
   }
 }
 
+function findEndOfCentralDirectory(bytes: Uint8Array, view: DataView): number {
+  const minimumOffset = Math.max(0, bytes.byteLength - 65_557);
+  for (let offset = bytes.byteLength - 22; offset >= minimumOffset; offset -= 1) {
+    if (view.getUint32(offset, true) !== END_OF_CENTRAL_DIRECTORY_SIGNATURE) continue;
+    const commentLength = view.getUint16(offset + 20, true);
+    if (offset + 22 + commentLength === bytes.byteLength) return offset;
+  }
+  throw new Error("MXL/ZIP 缺少中央目录");
+}
+
+function validateArchiveMetadata(bytes: Uint8Array): void {
+  if (bytes.byteLength > MAX_ARCHIVE_BYTES) throw new Error("MXL 压缩文件超过 25 MB 安全限制");
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const endOffset = findEndOfCentralDirectory(bytes, view);
+  const diskNumber = view.getUint16(endOffset + 4, true);
+  const centralDirectoryDisk = view.getUint16(endOffset + 6, true);
+  const entriesOnDisk = view.getUint16(endOffset + 8, true);
+  const fileCount = view.getUint16(endOffset + 10, true);
+  const centralDirectorySize = view.getUint32(endOffset + 12, true);
+  const centralDirectoryOffset = view.getUint32(endOffset + 16, true);
+  if (fileCount === 0xffff || centralDirectorySize === 0xffffffff || centralDirectoryOffset === 0xffffffff) {
+    throw new Error("MXL 不支持 ZIP64 容器");
+  }
+  if (diskNumber !== 0 || centralDirectoryDisk !== 0 || entriesOnDisk !== fileCount) {
+    throw new Error("MXL 不支持分卷 ZIP 容器");
+  }
+  if (fileCount > MAX_ARCHIVE_FILES) throw new Error(`MXL 包含超过 ${MAX_ARCHIVE_FILES} 个文件`);
+  if (centralDirectoryOffset + centralDirectorySize > endOffset) throw new Error("MXL/ZIP 中央目录无效");
+
+  let offset = centralDirectoryOffset;
+  let totalUncompressedBytes = 0;
+  for (let index = 0; index < fileCount; index += 1) {
+    if (offset + 46 > endOffset || view.getUint32(offset, true) !== CENTRAL_DIRECTORY_FILE_SIGNATURE) {
+      throw new Error("MXL/ZIP 中央目录条目无效");
+    }
+    const compressedBytes = view.getUint32(offset + 20, true);
+    const uncompressedBytes = view.getUint32(offset + 24, true);
+    if (compressedBytes === 0xffffffff || uncompressedBytes === 0xffffffff) {
+      throw new Error("MXL 不支持 ZIP64 文件条目");
+    }
+    if (uncompressedBytes > MAX_SINGLE_FILE_BYTES) throw new Error("MXL 包含超过 16 MB 的单个文件");
+    if (uncompressedBytes > 0 && (compressedBytes === 0 || uncompressedBytes / compressedBytes > MAX_COMPRESSION_RATIO)) {
+      throw new Error("MXL 包含异常压缩比的文件");
+    }
+    totalUncompressedBytes += uncompressedBytes;
+    if (totalUncompressedBytes > MAX_UNCOMPRESSED_BYTES) throw new Error("MXL 解压后超过 20 MB 安全限制");
+    const nameLength = view.getUint16(offset + 28, true);
+    const extraLength = view.getUint16(offset + 30, true);
+    const commentLength = view.getUint16(offset + 32, true);
+    offset += 46 + nameLength + extraLength + commentLength;
+  }
+  if (offset !== centralDirectoryOffset + centralDirectorySize) throw new Error("MXL/ZIP 中央目录大小不一致");
+}
+
 function findRootFile(containerXml: string): string {
   const parsed = parseXml(containerXml);
   const container = asRecord(parsed.container);
@@ -57,10 +117,12 @@ function findRootFile(containerXml: string): string {
 }
 
 export function extractMusicXml(buffer: ArrayBuffer): string {
-  const signature = new Uint8Array(buffer, 0, Math.min(4, buffer.byteLength));
+  const bytes = new Uint8Array(buffer);
+  const signature = bytes.subarray(0, Math.min(4, bytes.byteLength));
   if (signature[0] !== 0x50 || signature[1] !== 0x4b) throw new Error("文件不是有效的 MXL/ZIP 容器");
 
-  const files = unzipSync(new Uint8Array(buffer));
+  validateArchiveMetadata(bytes);
+  const files = unzipSync(bytes);
   let totalBytes = 0;
   for (const [path, content] of Object.entries(files)) {
     validateArchivePath(path);
