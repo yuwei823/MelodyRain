@@ -3,6 +3,7 @@ import { type PerformanceEffectConfig, type PerformanceEffectMode } from "../lib
 import {
   PROJECT_SETTINGS_VERSION,
   type BackgroundMode,
+  type ConnectedNoteMode,
   type ProjectSettings,
 } from "../lib/project-settings";
 import { PORTRAIT_RENDER_PROFILE } from "../lib/render-profile";
@@ -34,6 +35,7 @@ export function useProjectVisualSettings() {
   const [performanceEffectMode, setPerformanceEffectMode] = useState<PerformanceEffectMode>("mask");
   const [performanceMixColor, setPerformanceMixColor] = useState(DEFAULT_PERFORMANCE_MIX_COLOR);
   const [performanceMixPercent, setPerformanceMixPercent] = useState(DEFAULT_PERFORMANCE_MIX_PERCENT);
+  const [connectedNoteMode, setConnectedNoteMode] = useState<ConnectedNoteMode>("together");
   const [selectedBackgroundIndex, setSelectedBackgroundIndex] = useState(0);
   const [backgroundImageUrl, setBackgroundImageUrl] = useState<string | null>(null);
   const projectBackgroundsRef = useRef<File[]>([]);
@@ -49,6 +51,7 @@ export function useProjectVisualSettings() {
     setPerformanceEffectMode(settings.performanceEffectMode);
     setPerformanceMixColor(settings.performanceMixColor);
     setPerformanceMixPercent(settings.performanceMixPercent);
+    setConnectedNoteMode(settings.connectedNoteMode);
     const backgroundIndex = settings.backgroundImageFile
       ? projectBackgroundsRef.current.findIndex((file) => file.name === settings.backgroundImageFile)
       : -1;
@@ -72,6 +75,7 @@ export function useProjectVisualSettings() {
     setPerformanceEffectMode("mask");
     setPerformanceMixColor(DEFAULT_PERFORMANCE_MIX_COLOR);
     setPerformanceMixPercent(DEFAULT_PERFORMANCE_MIX_PERCENT);
+    setConnectedNoteMode("together");
     setSelectedBackgroundIndex(0);
     setBackgroundMode(project.backgrounds.length > 0 ? "image" : "color");
   }, [applyProjectSettings]);
@@ -126,9 +130,10 @@ export function useProjectVisualSettings() {
     performanceEffectMode,
     performanceMixColor,
     performanceMixPercent,
+    connectedNoteMode,
   }), [backgroundColor, backgroundMode, customTitle, maskBlackMixPercent, measuresPerSystem,
     paperTransparencyPercent, performanceEffectMode, performanceMixColor, performanceMixPercent,
-    selectedBackgroundFile, titleColor, titleColorMode]);
+    selectedBackgroundFile, titleColor, titleColorMode, connectedNoteMode]);
 
   return {
     customTitle, setCustomTitle, titleColor, setTitleColor, titleColorMode, setTitleColorMode,
@@ -137,6 +142,7 @@ export function useProjectVisualSettings() {
     setPaperTransparencyPercent, performanceEffectMode, setPerformanceEffectMode, performanceMixColor,
     setPerformanceMixColor, performanceMixPercent, setPerformanceMixPercent, selectedBackgroundIndex,
     setSelectedBackgroundIndex, maskSource, performanceEffectConfig, currentProjectSettings,
+    connectedNoteMode, setConnectedNoteMode,
     applyProjectSettings, adoptProjectSettings,
   };
 }

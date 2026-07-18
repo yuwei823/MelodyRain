@@ -5,7 +5,7 @@ import {
   type PerformanceEffectMode,
 } from "../lib/performance-effect-layer";
 import type { LoadedProject } from "../hooks/use-project-loader";
-import type { BackgroundMode } from "../lib/project-settings";
+import type { BackgroundMode, ConnectedNoteMode } from "../lib/project-settings";
 import type { TitleColorMode } from "../lib/title-color";
 
 interface ControlPanelProps {
@@ -46,6 +46,8 @@ interface ControlPanelProps {
   onPerformanceMixColorChange(value: string): void;
   performanceMixPercent: number;
   onPerformanceMixPercentChange(value: number): void;
+  connectedNoteMode: ConnectedNoteMode;
+  onConnectedNoteModeChange(value: ConnectedNoteMode): void;
 }
 
 export function ControlPanel({
@@ -86,11 +88,15 @@ export function ControlPanel({
   onPerformanceMixColorChange,
   performanceMixPercent,
   onPerformanceMixPercentChange,
+  connectedNoteMode,
+  onConnectedNoteModeChange,
 }: ControlPanelProps) {
   return (
     <aside className="control-panel">
       <div className="folder-picker">
-        <span>素材文件夹</span>
+        <div>
+          <p className="step-label">SOURCE FOLDER / 素材文件夹</p>
+        </div>
         <button className="folder-select-button" type="button" onClick={onChooseFolder}>
           {folderName ? `更换文件夹：${folderName}` : "选择素材文件夹"}
         </button>
@@ -130,8 +136,7 @@ export function ControlPanel({
       </div>
 
       <div className="title-control">
-        <span className="step-label">TITLE</span>
-        <strong>画面标题</strong>
+        <span className="step-label">TITLE / 画面标题</span>
         <input
           type="text"
           value={customTitle}
@@ -162,8 +167,7 @@ export function ControlPanel({
       <div className="layout-control">
         <div className="layout-control-heading">
           <div>
-            <p className="step-label">LAYOUT</p>
-            <strong>每行小节数</strong>
+            <p className="step-label">LAYOUT / 每行小节数</p>
           </div>
           <output>{measuresPerSystem}</output>
         </div>
@@ -180,8 +184,7 @@ export function ControlPanel({
 
       <div className="background-control">
         <div>
-          <p className="step-label">MASK SOURCE</p>
-          <strong>谱面蒙版背景</strong>
+          <p className="step-label">BACKGROUND / 谱面背景</p>
         </div>
         <div className="background-mode" aria-label="蒙版背景模式">
           <button
@@ -256,10 +259,9 @@ export function ControlPanel({
 
       <div className="performance-effect-control">
         <div>
-          <p className="step-label">PERFORMANCE EFFECT</p>
-          <strong>演奏元素效果</strong>
+          <p className="step-label">NOTE EFFECT / 音符着色</p>
         </div>
-        <div className="background-mode" aria-label="演奏元素效果模式">
+        <div className="background-mode" aria-label="音符着色">
           <button
             type="button"
             aria-pressed={performanceEffectMode === "mask"}
@@ -314,6 +316,19 @@ export function ControlPanel({
             <small>音头按书写音名着色；和弦符杆取远端音，连梁与无音高元素使用渐变。</small>
           </>
         )}
+      </div>
+
+      <div className="performance-effect-control">
+        <div>
+          <p className="step-label">CONNECTED NOTES / 共享连杆音符</p>
+        </div>
+        <div className="background-mode" aria-label="共享连杆音符模式">
+          <button type="button" aria-pressed={connectedNoteMode === "together"}
+            onClick={() => onConnectedNoteModeChange("together")}>一并落下</button>
+          <button type="button" aria-pressed={connectedNoteMode === "expand"}
+            onClick={() => onConnectedNoteModeChange("expand")}>落下后展开</button>
+        </div>
+        <small>仅影响共享符尾连杆的八分、十六分及更短音符。</small>
       </div>
     </aside>
   );

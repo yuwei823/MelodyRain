@@ -26,7 +26,7 @@ app.use(
 
 app.get("/api/health", (_request, response) => {
   response.json({ status: "ok", service: "melody-rain-local", version: appVersion });
-1});
+});
 
 app.get("/api/demo/manifest", (_request, response) => {
   response.json({

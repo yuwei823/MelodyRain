@@ -46,6 +46,7 @@ export default function App() {
     maskSource: visual.maskSource, maskBlackMixPercent: visual.maskBlackMixPercent,
     paperTransparencyPercent: visual.paperTransparencyPercent,
     performanceEffectConfig: visual.performanceEffectConfig,
+    connectedNoteMode: visual.connectedNoteMode,
     currentSourceTimeMs: transport.currentSourceTimeMs, setStatus, setError });
   stageUpdateRef.current = stage.update;
   const {
@@ -55,6 +56,7 @@ export default function App() {
     setPaperTransparencyPercent, performanceEffectMode, setPerformanceEffectMode, performanceMixColor,
     setPerformanceMixColor, performanceMixPercent, setPerformanceMixPercent, selectedBackgroundIndex,
     setSelectedBackgroundIndex, currentProjectSettings,
+    connectedNoteMode, setConnectedNoteMode,
   } = visual;
   const { snapshot, activeNotes, audioRef } = transport;
   const { targetCount, scoreHostRef, scoreViewportRef, scoreContentClipRef } = stage;
@@ -129,6 +131,8 @@ export default function App() {
           onPerformanceMixColorChange={setPerformanceMixColor}
           performanceMixPercent={performanceMixPercent}
           onPerformanceMixPercentChange={setPerformanceMixPercent}
+          connectedNoteMode={connectedNoteMode}
+          onConnectedNoteModeChange={setConnectedNoteMode}
         />
         <PlaybackPanel
           project={project}

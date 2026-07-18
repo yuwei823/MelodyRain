@@ -9,6 +9,7 @@ import { ScoreRenderer } from "../lib/score-renderer";
 import { ScoreTimelineLayer } from "../lib/score-timeline-layer";
 import { TRANSPORT_PRE_ROLL_MS, type TransportSnapshot } from "../lib/transport";
 import type { LoadedProject } from "./use-project-loader";
+import type { ConnectedNoteMode } from "../lib/project-settings";
 
 interface ScoreStageOptions {
   project: LoadedProject | null;
@@ -17,6 +18,7 @@ interface ScoreStageOptions {
   maskBlackMixPercent: number;
   paperTransparencyPercent: number;
   performanceEffectConfig: PerformanceEffectConfig;
+  connectedNoteMode: ConnectedNoteMode;
   currentSourceTimeMs(): number;
   setStatus(status: string): void;
   setError(error: string | null): void;
@@ -24,7 +26,7 @@ interface ScoreStageOptions {
 
 export function useScoreStage(options: ScoreStageOptions) {
   const { project, measuresPerSystem, maskSource, maskBlackMixPercent, paperTransparencyPercent,
-    performanceEffectConfig, currentSourceTimeMs, setStatus, setError } = options;
+    performanceEffectConfig, connectedNoteMode, currentSourceTimeMs, setStatus, setError } = options;
   const [targetCount, setTargetCount] = useState(0);
   const scoreHostRef = useRef<HTMLDivElement>(null);
   const scoreViewportRef = useRef<HTMLDivElement>(null);
@@ -76,7 +78,7 @@ export function useScoreStage(options: ScoreStageOptions) {
         if (cancelled) return;
         const timeline = new MidiTimeline(project.midi);
         const rainLayer = new RainLayer(host, timeline);
-        rainLayer.setEvents(project.midi.events, targets, restSymbols);
+        rainLayer.setEvents(project.midi.events, targets, restSymbols, connectedNoteMode);
         const timeMs = currentSourceTimeMs() ?? -TRANSPORT_PRE_ROLL_MS - 1;
         rainLayer.update(timeMs);
         rainLayerRef.current = rainLayer;
@@ -117,7 +119,7 @@ export function useScoreStage(options: ScoreStageOptions) {
       disposeLayers();
       renderHost.remove();
     };
-  }, [currentSourceTimeMs, measuresPerSystem, project, setError, setStatus]);
+  }, [connectedNoteMode, currentSourceTimeMs, measuresPerSystem, project, setError, setStatus]);
 
   useEffect(() => {
     scoreMaskLayerRef.current?.setSource(maskSource);

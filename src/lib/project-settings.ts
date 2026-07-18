@@ -2,8 +2,9 @@ import type { PerformanceEffectMode } from "./performance-effect-layer";
 import { DARK_TITLE_COLOR, type TitleColorMode } from "./title-color";
 
 export const PROJECT_SETTINGS_FILE_NAME = "melody-rain.settings.json";
-export const PROJECT_SETTINGS_VERSION = 2 as const;
+export const PROJECT_SETTINGS_VERSION = 3 as const;
 export type BackgroundMode = "image" | "color";
+export type ConnectedNoteMode = "together" | "expand";
 
 export interface ProjectSettings {
   version: typeof PROJECT_SETTINGS_VERSION;
@@ -19,6 +20,7 @@ export interface ProjectSettings {
   performanceEffectMode: PerformanceEffectMode;
   performanceMixColor: string;
   performanceMixPercent: number;
+  connectedNoteMode: ConnectedNoteMode;
 }
 
 type SettingsRecord = Record<string, unknown>;
@@ -30,6 +32,11 @@ const SETTINGS_MIGRATIONS: Record<number, SettingsMigration> = {
     version: 2,
     titleColor: settings.titleColor ?? DARK_TITLE_COLOR,
     titleColorMode: settings.titleColorMode ?? "auto",
+  }),
+  2: (settings) => ({
+    ...settings,
+    version: 3,
+    connectedNoteMode: settings.connectedNoteMode ?? "together",
   }),
 };
 
@@ -87,6 +94,9 @@ export function parseProjectSettings(text: string): ProjectSettings {
   if (value.performanceEffectMode !== "mask" && value.performanceEffectMode !== "rainbow") {
     throw new Error("performanceEffectMode 无效");
   }
+  if (value.connectedNoteMode !== "together" && value.connectedNoteMode !== "expand") {
+    throw new Error("connectedNoteMode 无效");
+  }
   if (value.titleColorMode !== undefined && value.titleColorMode !== "auto" && value.titleColorMode !== "custom") {
     throw new Error("titleColorMode 无效");
   }
@@ -109,6 +119,7 @@ export function parseProjectSettings(text: string): ProjectSettings {
     performanceEffectMode: value.performanceEffectMode,
     performanceMixColor: color(value.performanceMixColor, "performanceMixColor"),
     performanceMixPercent: percent(value.performanceMixPercent, "performanceMixPercent"),
+    connectedNoteMode: value.connectedNoteMode,
   };
 }
 

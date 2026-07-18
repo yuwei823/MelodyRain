@@ -1,6 +1,6 @@
 # MelodyRain 产品与技术规格说明书
 
-**版本：** v0.1.3
+**版本：** v0.1.4
 **状态：** Draft  
 **日期：** 2026-07-18
 **示例来源：** https://musescore.com/user/28854994/scores/11566147  
@@ -411,7 +411,14 @@ MVP-1 与 MVP-2 规划：
 
 休止符的字形、附点、fermata 以及直接属于该休止符的其他 modifier 组成一个 `RestVisualGroup`，使用同一 transform 整体下落。单音 tremolo 斜线、stroke、ornament 等即使由 VexFlow 渲染为 `.vf-stavenote` 外部的兄弟 SVG 组，也必须根据所属小节、时间位置和横坐标并入对应 `NoteVisualGroup`，不得留在原谱位置。
 
-空心二分音符、全音符及其他空心符头只能改变原有轮廓颜色，不得填满内部空白。和弦的全部符头、共享符干和附属记号组成一个 `NoteVisualGroup`。连续八分、十六分及更短时值音符若共享 beam，则其全部符头、外置符干、多层连杆和 beam hook 合并为一个 `ConnectedNoteVisualGroup`，以组内第一个实际 note-on 作为共同命中时间。加线必须与所属音符共同下落，不能留在原谱位置。
+空心二分音符、全音符及其他空心符头只能改变原有轮廓颜色，不得填满内部空白。和弦的全部符头、共享符干和附属记号组成一个 `NoteVisualGroup`。加线必须与所属音符共同运动或显现，不能留在原谱位置。
+
+连续八分、十六分及更短时值音符若共享 beam，则组成 `ConnectedNoteVisualGroup`，并支持两种全局模式：
+
+- `together`（一并落下，默认）：全部符头、外置符干、多层连杆和 beam hook 合并为一个动画组，以组内第一个实际 note-on 作为共同命中时间；行为与 v1/v2 设置文件兼容。
+- `expand`（落下后展开）：只有组内第一个实际 note-on 对应的音符或和弦连同自身符干、加线和 modifier 从上方落下。首音落地时显示 beam 起始小段；从前一个 note-on 到下一个 note-on 之间，多层 beam 与 beam hook 使用同一个横向裁切边界连续向右生长。后续音符不再纵向下落，而在各自 note-on 时完整显示符头、符干、升降号、附点、加线及直接所属 modifier。和弦内全部符头和共享符干同时显示。
+
+`expand` 的状态必须完全由绝对 Transport 时间计算。暂停、跳转、倒退和变速后，未来音符重新隐藏、beam 缩回对应边界，已命中音符立即恢复；不得依赖上一帧累计。切换模式不得改变 Transport 时间或重新解析素材。
 
 ```ts
 interface NoteVisualGroup {
@@ -715,7 +722,7 @@ MVP-1 只生成竖屏视频：
 - 目标点必须落在对应 notehead 边界框内；
 - 所有目标点必须处于可见画布范围内；
 - 和弦、跨谱表音符与加线音符不得被压到相邻谱表；
-- 符头、符干、符尾、附点、升降号、加线、modifier 与共享 beam 在任意动画帧不得彼此分离；
+- 单个 `NoteVisualGroup` 内的符头、符干、符尾、附点、升降号、加线和 modifier 在任意动画帧不得彼此分离；共享 beam 在 `together` 模式与整组共同运动，在 `expand` 模式按 FR-09.1 的裁切规则连续展开；
 - 空心符头在变色、发光和停留阶段必须保持空心；
 - 跨音符连接符号的生长端点必须位于其原始 SVG 路径上，到终止音符命中时完整显示；
 - 谱面说明元素只能改变透明度，不得因渐显发生位置或布局变化；
@@ -1276,11 +1283,11 @@ MVP 至少维护以下自有或可合法再分发的固定测试谱：
 
 ### 15.2 设置文件契约
 
-设置文件名固定为 `melody-rain.settings.json`，当前格式版本为 `2`。保存操作总是输出当前版本；读取时先迁移再校验。
+设置文件名固定为 `melody-rain.settings.json`，当前格式版本为 `3`。保存操作总是输出当前版本；读取时先迁移再校验。
 
 | 字段 | v2 类型/范围 | 说明 |
 |---|---|---|
-| `version` | `2` | 当前格式版本 |
+| `version` | `3` | 当前格式版本 |
 | `title` | string | 自定义标题，允许空字符串 |
 | `titleColor` | `#RRGGBB` | 标题颜色 |
 | `titleColorMode` | `auto` / `custom` | 自动对比色或自定义颜色 |
@@ -1293,8 +1300,9 @@ MVP 至少维护以下自有或可合法再分发的固定测试谱：
 | `performanceEffectMode` | `mask` / `rainbow` | 演奏元素效果 |
 | `performanceMixColor` | `#RRGGBB` | 演奏蒙版混色 |
 | `performanceMixPercent` | 0–100 | 演奏蒙版混色比例 |
+| `connectedNoteMode` | `together` / `expand` | 共享连杆音符一并落下或落下后展开 |
 
-v1 → v2 迁移新增 `titleColor` 与 `titleColorMode`。旧文件缺少字段时分别使用 `#25364A` 和 `auto`；若旧文件已经包含合法值则保留。缺少有效版本号、低于 v1、或高于当前版本的文件拒绝读取。百分数字段读取时取整并钳制至 0–100，随后继续执行字段范围校验。
+v1 → v2 迁移新增 `titleColor` 与 `titleColorMode`。旧文件缺少字段时分别使用 `#25364A` 和 `auto`；若旧文件已经包含合法值则保留。v2 → v3 新增 `connectedNoteMode`，旧文件默认迁移为 `together`。缺少有效版本号、低于 v1、或高于当前版本的文件拒绝读取。百分数字段读取时取整并钳制至 0–100，随后继续执行字段范围校验。
 
 ### 15.3 尚未实现的目标态能力
 
@@ -1309,7 +1317,7 @@ v1 → v2 迁移新增 `titleColor` 与 `titleColorMode`。旧文件缺少字段
 
 - TypeScript 启用 `strict`、`noUncheckedIndexedAccess`、`noUnusedLocals` 与 `noUnusedParameters`。
 - 自动化测试覆盖素材匹配、MXL/MIDI 解析、设置迁移、Transport、相机、布局目标、谱面净化、雨滴、时间层、蒙版和演奏效果核心逻辑。
-- 截至本章日期，仓库测试基线为 15 个测试文件、58 项测试；类型检查和生产构建应作为每次发布的最低门禁。
+- 截至本章日期，仓库测试基线为 16 个测试文件、63 项测试；类型检查和生产构建应作为每次发布的最低门禁。
 
 ### 15.5 当前前端职责边界
 

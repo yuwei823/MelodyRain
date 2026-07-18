@@ -15,6 +15,7 @@ The current version focuses on portrait-format previews in the browser. Video ex
 - Scrolls the score vertically with the active system;
 - Uses a fixed image or solid color as the score mask source, with adjustable black mixing and paper transparency;
 - Offers shared-mask and C–B rainbow styles for performance elements;
+- Lets beamed note groups fall together or expand left to right after the first note lands;
 - Supports automatic high-contrast or custom title colors;
 - Allows 1–6 measures per system;
 - Saves project parameters to `melody-rain.settings.json` and restores them when the asset folder is loaded again.

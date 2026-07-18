@@ -22,6 +22,7 @@ const SETTINGS: ProjectSettings = {
   performanceEffectMode: "mask",
   performanceMixColor: "#A11CE9",
   performanceMixPercent: 62,
+  connectedNoteMode: "expand",
 };
 
 describe("project settings", () => {
@@ -38,7 +39,7 @@ describe("project settings", () => {
   });
 
   it("rejects unsupported versions and invalid colors", () => {
-    expect(() => parseProjectSettings(JSON.stringify({ ...SETTINGS, version: 3 }))).toThrow("版本");
+    expect(() => parseProjectSettings(JSON.stringify({ ...SETTINGS, version: 4 }))).toThrow("版本");
     expect(() => parseProjectSettings(JSON.stringify({ ...SETTINGS, performanceMixColor: "purple" })))
       .toThrow("颜色");
   });
@@ -72,7 +73,19 @@ describe("project settings", () => {
       titleColorMode: "custom",
     }));
 
-    expect(parsed).toMatchObject({ version: 2, titleColor: "#123456", titleColorMode: "custom" });
+    expect(parsed).toMatchObject({ version: 3, titleColor: "#123456", titleColorMode: "custom" });
+  });
+
+  it("migrates version-2 files to the compatible together mode", () => {
+    const { connectedNoteMode: _connectedNoteMode, ...version2 } = SETTINGS;
+    const parsed = parseProjectSettings(JSON.stringify({ ...version2, version: 2 }));
+
+    expect(parsed).toMatchObject({ version: 3, connectedNoteMode: "together" });
+  });
+
+  it("rejects invalid connected-note modes", () => {
+    expect(() => parseProjectSettings(JSON.stringify({ ...SETTINGS, connectedNoteMode: "cascade" })))
+      .toThrow("connectedNoteMode");
   });
 
   it("rejects files without a valid version instead of guessing their schema", () => {

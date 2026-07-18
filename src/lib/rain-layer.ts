@@ -9,6 +9,7 @@ import {
   type PerformanceVisuals,
 } from "./performance-effect-layer";
 import type { ScoreTarget, TimedRainSymbol } from "./score-renderer";
+import type { ConnectedNoteMode } from "./project-settings";
 
 export interface RainChord {
   id: string;
@@ -24,6 +25,24 @@ interface RenderedRainSymbol {
   paints: PerformancePaintAssignment[];
   visibility: "hidden" | "visible";
   fallOffset: number | null;
+  isHit: boolean;
+  isLanded: boolean;
+  falls: boolean;
+}
+
+interface BeamedChordGroup {
+  chords: RainChord[];
+  beamElements: SVGGraphicsElement[];
+}
+
+interface RenderedConnectedGroup {
+  chords: RainChord[];
+  beamElements: SVGGraphicsElement[];
+  paints: PerformancePaintAssignment[];
+  revealFractions: number[];
+  visibility: "hidden" | "visible";
+  fallOffset: number | null;
+  clipProgress: number | null;
   isHit: boolean;
   isLanded: boolean;
 }
@@ -125,7 +144,7 @@ export function fallbackRainChords(
   return [...groups.values()].sort((left, right) => left.attackMs - right.attackMs);
 }
 
-function mergeBeamedChords(chords: RainChord[]): RainChord[] {
+export function groupBeamedChords(chords: RainChord[]): BeamedChordGroup[] {
   const parents = chords.map((_, index) => index);
   const firstChordForBeam = new Map<SVGGraphicsElement, number>();
 
@@ -151,36 +170,86 @@ function mergeBeamedChords(chords: RainChord[]): RainChord[] {
     });
   });
 
-  const merged = new Map<number, RainChord>();
+  const grouped = new Map<number, RainChord[]>();
   chords.forEach((chord, index) => {
     const root = find(index);
-    const existing = merged.get(root);
-    if (!existing) {
-      merged.set(root, { ...chord, events: [...chord.events], targets: [...chord.targets] });
-      return;
-    }
-    existing.events.push(...chord.events);
-    existing.targets.push(...chord.targets);
-    existing.attackMs = Math.min(existing.attackMs, chord.attackMs);
-    existing.releaseMs = Math.max(existing.releaseMs, chord.releaseMs);
+    const existing = grouped.get(root) ?? [];
+    existing.push(chord);
+    grouped.set(root, existing);
   });
 
-  return [...merged.values()].sort((left, right) => left.attackMs - right.attackMs);
+  return [...grouped.values()].map((members) => {
+    const sorted = [...members].sort((left, right) => chordX(left) - chordX(right) || left.attackMs - right.attackMs);
+    return {
+      chords: sorted,
+      beamElements: [...new Set(sorted.flatMap((chord) =>
+        chord.targets.flatMap((target) => target.notation?.beamElements ?? []),
+      ))],
+    };
+  }).sort((left, right) => left.chords[0]!.attackMs - right.chords[0]!.attackMs);
+}
+
+function chordX(chord: RainChord): number {
+  return Math.min(...chord.targets.map((target) => target.x));
+}
+
+function mergeChordGroup(chords: RainChord[]): RainChord {
+  const first = chords[0]!;
+  return {
+    ...first,
+    events: chords.flatMap((chord) => chord.events),
+    targets: chords.flatMap((chord) => chord.targets),
+    attackMs: Math.min(...chords.map((chord) => chord.attackMs)),
+    releaseMs: Math.max(...chords.map((chord) => chord.releaseMs)),
+  };
+}
+
+export function connectedBeamProgress(chords: RainChord[], timeMs: number): number {
+  if (chords.length < 2) return timeMs >= chords[0]!.attackMs ? 1 : 0;
+  const positions = chords.map(chordX);
+  const left = positions[0]!;
+  const width = Math.max(1, positions.at(-1)! - left);
+  const fractions = positions.map((position, index) => index === 0 ? 0.05 : (position - left) / width);
+  if (timeMs <= chords[0]!.attackMs) return fractions[0]!;
+  for (let index = 1; index < chords.length; index += 1) {
+    const previous = chords[index - 1]!;
+    const next = chords[index]!;
+    if (timeMs > next.attackMs) continue;
+    const duration = next.attackMs - previous.attackMs;
+    if (duration <= 0) return fractions[index]!;
+    const progress = Math.max(0, Math.min(1, (timeMs - previous.attackMs) / duration));
+    return fractions[index - 1]! + (fractions[index]! - fractions[index - 1]!) * progress;
+  }
+  return 1;
 }
 
 export class RainLayer {
   private symbols: RenderedRainSymbol[] = [];
+  private connectedGroups: RenderedConnectedGroup[] = [];
 
   constructor(_container: HTMLElement, private readonly timeline: MidiTimeline) {}
 
-  setEvents(events: MidiNoteEvent[], targets: ScoreTarget[], rests: TimedRainSymbol[] = []): number {
+  setEvents(
+    events: MidiNoteEvent[],
+    targets: ScoreTarget[],
+    rests: TimedRainSymbol[] = [],
+    connectedNoteMode: ConnectedNoteMode = "together",
+  ): number {
     this.clearRenderedElements();
+    this.connectedGroups = [];
     const midiChords = mapRainChords(events, targets);
     const mappedTargetIds = new Set(midiChords.flatMap((chord) => chord.targets.map((target) => target.id)));
-    const noteSymbols = mergeBeamedChords([
+    const groups = groupBeamedChords([
       ...midiChords,
       ...fallbackRainChords(targets, mappedTargetIds, (scoreQuarter) => this.timeline.timeAtScoreQuarter(scoreQuarter)),
-    ]).map((chord) => this.renderChord(chord));
+    ]);
+    const noteSymbols = groups.flatMap((group) => {
+      if (connectedNoteMode !== "expand" || group.chords.length < 2 || group.beamElements.length === 0) {
+        return [this.renderChord(mergeChordGroup(group.chords), true)];
+      }
+      this.connectedGroups.push(this.prepareConnectedGroup(group));
+      return group.chords.map((chord, index) => this.renderChord(chord, false, index !== 0));
+    });
     const restSymbols = rests.map((rest) => this.renderRest(rest));
     this.symbols = [...noteSymbols, ...restSymbols].sort((left, right) => left.attackMs - right.attackMs);
     return this.symbols.length;
@@ -189,10 +258,10 @@ export class RainLayer {
   update(timeMs: number): void {
     for (const symbol of this.symbols) {
       const { attackMs, elements } = symbol;
-      const startMs = attackMs - FALL_DURATION_MS;
+      const startMs = symbol.falls ? attackMs - FALL_DURATION_MS : attackMs;
       const isVisible = timeMs >= startMs;
-      const rawProgress = Math.max(0, Math.min(1, (timeMs - startMs) / FALL_DURATION_MS));
-      const fallOffset = -FALL_DISTANCE_PX * (1 - easeInCubic(rawProgress));
+      const rawProgress = symbol.falls ? Math.max(0, Math.min(1, (timeMs - startMs) / FALL_DURATION_MS)) : 1;
+      const fallOffset = symbol.falls ? -FALL_DISTANCE_PX * (1 - easeInCubic(rawProgress)) : 0;
       const isHit = timeMs >= attackMs && timeMs < attackMs + HIT_DURATION_MS;
       const isLanded = timeMs >= attackMs;
 
@@ -214,30 +283,103 @@ export class RainLayer {
         symbol.isLanded = isLanded;
       }
     }
+    this.connectedGroups.forEach((group) => this.updateConnectedGroup(group, timeMs));
   }
 
   dispose(): void {
     this.clearRenderedElements();
     this.symbols = [];
+    this.connectedGroups = [];
   }
 
   performanceVisuals(): PerformanceVisuals {
     return {
-      maskElements: [...new Set(this.symbols.flatMap((symbol) => symbol.elements))],
-      paints: this.symbols.flatMap((symbol) => symbol.paints),
+      maskElements: [...new Set([
+        ...this.symbols.flatMap((symbol) => symbol.elements),
+        ...this.connectedGroups.flatMap((group) => group.beamElements),
+      ])],
+      paints: [
+        ...this.symbols.flatMap((symbol) => symbol.paints),
+        ...this.connectedGroups.flatMap((group) => group.paints),
+      ],
     };
   }
 
-  private renderChord(chord: RainChord): RenderedRainSymbol {
+  private prepareConnectedGroup(group: BeamedChordGroup): RenderedConnectedGroup {
+    const merged = mergeChordGroup(group.chords);
+    const beamSet = new Set(group.beamElements);
+    const paints = this.chordPaints(merged).filter(({ element }) => beamSet.has(element));
+    const staffClass = this.staffClassForElements(group.beamElements, merged.targets[0]?.staffIndex ?? 0);
+    const positions = group.chords.map(chordX);
+    const left = positions[0]!;
+    const width = Math.max(1, positions.at(-1)! - left);
+    const revealFractions = positions.map((position, index) => index === 0 ? 0.05 : (position - left) / width);
+    group.beamElements.forEach((element) => {
+      element.classList.add("rain-score-symbol", staffClass, "connected-note-beam");
+      element.style.visibility = "hidden";
+      element.style.clipPath = "inset(0 95% 0 0)";
+    });
+    return {
+      chords: group.chords,
+      beamElements: group.beamElements,
+      paints,
+      revealFractions,
+      visibility: "hidden",
+      fallOffset: null,
+      clipProgress: null,
+      isHit: false,
+      isLanded: false,
+    };
+  }
+
+  private updateConnectedGroup(group: RenderedConnectedGroup, timeMs: number): void {
+    const firstAttackMs = group.chords[0]!.attackMs;
+    const startMs = firstAttackMs - FALL_DURATION_MS;
+    const visible = timeMs >= startMs;
+    const visibility = visible ? "visible" : "hidden";
+    if (visibility !== group.visibility) {
+      group.beamElements.forEach((element) => { element.style.visibility = visibility; });
+      group.visibility = visibility;
+    }
+    if (!visible) return;
+
+    const fallProgress = Math.max(0, Math.min(1, (timeMs - startMs) / FALL_DURATION_MS));
+    const fallOffset = timeMs < firstAttackMs ? -FALL_DISTANCE_PX * (1 - easeInCubic(fallProgress)) : 0;
+    if (fallOffset !== group.fallOffset) {
+      group.beamElements.forEach((element) => { element.style.transform = `translateY(${fallOffset}px)`; });
+      group.fallOffset = fallOffset;
+    }
+    const clipProgress = connectedBeamProgress(group.chords, timeMs);
+    if (clipProgress !== group.clipProgress) {
+      const hiddenPercent = Math.max(0, (1 - clipProgress) * 100);
+      group.beamElements.forEach((element) => { element.style.clipPath = `inset(0 ${hiddenPercent}% 0 0)`; });
+      group.clipProgress = clipProgress;
+    }
+    const isHit = group.chords.some((chord) => timeMs >= chord.attackMs && timeMs < chord.attackMs + HIT_DURATION_MS);
+    if (isHit !== group.isHit) {
+      group.beamElements.forEach((element) => element.classList.toggle("is-hit", isHit));
+      group.isHit = isHit;
+    }
+    const isLanded = timeMs >= firstAttackMs;
+    if (isLanded !== group.isLanded) {
+      group.beamElements.forEach((element) => element.classList.toggle("is-landed", isLanded));
+      group.isLanded = isLanded;
+    }
+  }
+
+  private renderChord(chord: RainChord, includeBeams = true, staticReveal = false): RenderedRainSymbol {
     const elements = new Set<SVGGraphicsElement>();
     chord.targets.forEach((target) => {
       if (!target.notation) return;
       elements.add(target.notation.noteElement);
       target.notation.attachedElements.forEach((element) => elements.add(element));
-      target.notation.beamElements.forEach((element) => elements.add(element));
+      if (includeBeams) target.notation.beamElements.forEach((element) => elements.add(element));
     });
     const paints = this.chordPaints(chord);
-    return this.prepareSymbol(chord.attackMs, [...elements], chord.targets[0]?.staffIndex ?? 0, paints);
+    const filteredPaints = includeBeams ? paints : paints.filter(({ element }) => !chord.targets.some(
+      (target) => target.notation?.beamElements.includes(element),
+    ));
+    return this.prepareSymbol(chord.attackMs, [...elements], chord.targets[0]?.staffIndex ?? 0, filteredPaints, !staticReveal);
   }
 
   private renderRest(rest: TimedRainSymbol): RenderedRainSymbol {
@@ -257,6 +399,7 @@ export class RainLayer {
     elements: SVGGraphicsElement[],
     staffIndex: number,
     paints: PerformancePaintAssignment[],
+    falls = true,
   ): RenderedRainSymbol {
     const staffClass = this.staffClassForElements(elements, staffIndex);
     elements.forEach((element) => {
@@ -272,6 +415,7 @@ export class RainLayer {
       fallOffset: null,
       isHit: false,
       isLanded: false,
+      falls,
     };
   }
 
@@ -339,10 +483,14 @@ export class RainLayer {
   }
 
   private clearRenderedElements(): void {
-    this.symbols.flatMap((rendered) => rendered.elements).forEach((element) => {
-      element.classList.remove("rain-score-symbol", "staff-treble", "staff-bass", "is-hit", "is-landed");
+    [
+      ...this.symbols.flatMap((rendered) => rendered.elements),
+      ...this.connectedGroups.flatMap((group) => group.beamElements),
+    ].forEach((element) => {
+      element.classList.remove("rain-score-symbol", "staff-treble", "staff-bass", "is-hit", "is-landed", "connected-note-beam");
       element.style.removeProperty("transform");
       element.style.removeProperty("visibility");
+      element.style.removeProperty("clip-path");
     });
   }
 }

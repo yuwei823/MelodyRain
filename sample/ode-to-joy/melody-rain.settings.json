@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "title": "Ode to Joy",
   "titleColor": "#F4F7FB",
   "titleColorMode": "auto",
@@ -11,5 +11,6 @@
   "paperTransparencyPercent": 19,
   "performanceEffectMode": "rainbow",
   "performanceMixColor": "#344A21",
-  "performanceMixPercent": 56
+  "performanceMixPercent": 56,
+  "connectedNoteMode": "together"
 }
