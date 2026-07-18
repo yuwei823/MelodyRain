@@ -17,6 +17,7 @@ import { ScoreMaskLayer, type ScoreMaskSource } from "./lib/score-mask-layer";
 import { ScoreRenderer } from "./lib/score-renderer";
 import { ScoreTimelineLayer } from "./lib/score-timeline-layer";
 import { MediaTransport, TRANSPORT_PRE_ROLL_MS, type TransportSnapshot } from "./lib/transport";
+import type { ProjectSettings } from "./lib/project-settings";
 
 const EMPTY_SNAPSHOT: TransportSnapshot = {
   state: "idle",
@@ -43,11 +44,11 @@ export default function App() {
   const [measuresPerSystem, setMeasuresPerSystem] = useState(PORTRAIT_RENDER_PROFILE.measuresPerSystem);
   const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>("color");
   const [backgroundColor, setBackgroundColor] = useState("#000000");
-  const [maskBlackMixPercent, setMaskBlackMixPercent] = useState(10);
-  const [paperTransparencyPercent, setPaperTransparencyPercent] = useState(0);
+  const [maskBlackMixPercent, setMaskBlackMixPercent] = useState(40);
+  const [paperTransparencyPercent, setPaperTransparencyPercent] = useState(10);
   const [performanceEffectMode, setPerformanceEffectMode] = useState<PerformanceEffectMode>("mask");
   const [performanceMixColor, setPerformanceMixColor] = useState("#1CAEE8");
-  const [performanceMixPercent, setPerformanceMixPercent] = useState(35);
+  const [performanceMixPercent, setPerformanceMixPercent] = useState(50);
   const [selectedBackgroundIndex, setSelectedBackgroundIndex] = useState(0);
   const [backgroundImageUrl, setBackgroundImageUrl] = useState<string | null>(null);
   const scoreHostRef = useRef<HTMLDivElement>(null);
@@ -59,13 +60,34 @@ export default function App() {
   const scoreCameraRef = useRef<ScoreCamera | null>(null);
   const scoreMaskLayerRef = useRef<ScoreMaskLayer | null>(null);
   const performanceEffectLayerRef = useRef<PerformanceEffectLayer | null>(null);
+  const projectBackgroundsRef = useRef<File[]>([]);
+
+  const applyProjectSettings = useCallback((settings: ProjectSettings) => {
+    setCustomTitle(settings.title);
+    setMeasuresPerSystem(settings.measuresPerSystem);
+    setBackgroundColor(settings.backgroundColor);
+    setMaskBlackMixPercent(settings.maskBlackMixPercent);
+    setPaperTransparencyPercent(settings.paperTransparencyPercent);
+    setPerformanceEffectMode(settings.performanceEffectMode);
+    setPerformanceMixColor(settings.performanceMixColor);
+    setPerformanceMixPercent(settings.performanceMixPercent);
+    const backgroundIndex = settings.backgroundImageFile
+      ? projectBackgroundsRef.current.findIndex((file) => file.name === settings.backgroundImageFile)
+      : -1;
+    setSelectedBackgroundIndex(Math.max(0, backgroundIndex));
+    setBackgroundMode(settings.backgroundMode === "image" && backgroundIndex >= 0 ? "image" : "color");
+  }, []);
 
   const handleProjectLoaded = useCallback((nextProject: LoadedProject) => {
-    setCustomTitle("");
-    setSelectedBackgroundIndex(0);
-    setBackgroundMode(nextProject.backgrounds.length > 0 ? "image" : "color");
+    projectBackgroundsRef.current = nextProject.backgrounds;
+    if (nextProject.settings) applyProjectSettings(nextProject.settings);
+    else {
+      setCustomTitle("");
+      setSelectedBackgroundIndex(0);
+      setBackgroundMode(nextProject.backgrounds.length > 0 ? "image" : "color");
+    }
     setSnapshot(EMPTY_SNAPSHOT);
-  }, []);
+  }, [applyProjectSettings]);
   const {
     project,
     status,
@@ -76,14 +98,44 @@ export default function App() {
     midiFile,
     audioFile,
     backgroundFiles,
+    settingsFile,
     folderName,
     folderInputRef,
     remembersFolders,
     selectAssetFolder,
     chooseAndLoadAssetFolder,
-  } = useProjectLoader({ onProjectLoaded: handleProjectLoaded });
+    readProjectSettings,
+    saveProjectSettings,
+  } = useProjectLoader({
+    onProjectLoaded: handleProjectLoaded,
+    onSettingsLoaded: applyProjectSettings,
+  });
 
   const selectedBackgroundFile = project?.backgrounds[selectedBackgroundIndex] ?? null;
+  const currentProjectSettings = useMemo<ProjectSettings>(() => ({
+    version: 1,
+    title: customTitle,
+    measuresPerSystem,
+    backgroundMode,
+    backgroundColor,
+    backgroundImageFile: selectedBackgroundFile?.name ?? null,
+    maskBlackMixPercent,
+    paperTransparencyPercent,
+    performanceEffectMode,
+    performanceMixColor,
+    performanceMixPercent,
+  }), [
+    backgroundColor,
+    backgroundMode,
+    customTitle,
+    maskBlackMixPercent,
+    measuresPerSystem,
+    paperTransparencyPercent,
+    performanceEffectMode,
+    performanceMixColor,
+    performanceMixPercent,
+    selectedBackgroundFile,
+  ]);
   useEffect(() => {
     if (!selectedBackgroundFile) {
       setBackgroundImageUrl(null);
@@ -292,9 +344,12 @@ export default function App() {
           midiFile={midiFile}
           audioFile={audioFile}
           backgroundFiles={backgroundFiles}
+          settingsFile={settingsFile}
           folderInputRef={folderInputRef}
           onChooseFolder={() => void chooseAndLoadAssetFolder()}
           onSelectFolder={selectAssetFolder}
+          onReadParameters={readProjectSettings}
+          onSaveParameters={() => void saveProjectSettings(currentProjectSettings)}
           customTitle={customTitle}
           onCustomTitleChange={setCustomTitle}
           measuresPerSystem={measuresPerSystem}

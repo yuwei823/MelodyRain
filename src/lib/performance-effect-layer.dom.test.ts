@@ -1,0 +1,89 @@
+// @vitest-environment jsdom
+
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { PerformanceEffectLayer } from "./performance-effect-layer";
+
+function bounds(width: number, height: number): DOMRect {
+  return {
+    x: 0,
+    y: 0,
+    width,
+    height,
+    top: 0,
+    right: width,
+    bottom: height,
+    left: 0,
+    toJSON: () => ({ width, height }),
+  } as DOMRect;
+}
+
+describe("PerformanceEffectLayer mode isolation", () => {
+  const frames = new Map<number, FrameRequestCallback>();
+  let nextFrame = 1;
+
+  beforeEach(() => {
+    frames.clear();
+    nextFrame = 1;
+    vi.stubGlobal("ResizeObserver", class {
+      observe() {}
+      disconnect() {}
+    });
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      const id = nextFrame++;
+      frames.set(id, callback);
+      return id;
+    });
+    vi.stubGlobal("cancelAnimationFrame", (id: number) => frames.delete(id));
+  });
+
+  afterEach(() => {
+    document.body.replaceChildren();
+    vi.unstubAllGlobals();
+  });
+
+  it("never writes rainbow paint while masked and restores it when switching back to mask", () => {
+    const frame = document.createElement("div");
+    const viewport = document.createElement("div");
+    Object.defineProperties(viewport, {
+      clientWidth: { configurable: true, value: 800 },
+      clientHeight: { configurable: true, value: 600 },
+    });
+    frame.getBoundingClientRect = () => bounds(800, 600);
+    viewport.getBoundingClientRect = () => bounds(800, 600);
+    viewport.append(frame);
+    document.body.append(viewport);
+
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    const note = document.createElementNS("http://www.w3.org/2000/svg", "path") as SVGGraphicsElement;
+    note.style.fill = "black";
+    note.getBoundingClientRect = () => bounds(12, 8);
+    Object.defineProperty(note, "getScreenCTM", { configurable: true, value: () => null });
+    svg.append(note);
+    frame.append(svg);
+
+    const layer = new PerformanceEffectLayer(frame, viewport);
+    layer.setVisuals({
+      maskElements: [note],
+      paints: [{ element: note, paint: { kind: "solid", color: "#F05D6C" } }],
+    });
+
+    expect(viewport.classList.contains("performance-mask-mode")).toBe(true);
+    expect(note.classList.contains("performance-mask-source")).toBe(true);
+    expect(note.style.fill).toBe("black");
+    expect(frames.size).toBe(0);
+
+    layer.setConfig({ mode: "rainbow", mixColor: "#1CAEE8", mixAmount: 0.35 });
+    expect(frames.size).toBe(1);
+    const [frameId, callback] = frames.entries().next().value!;
+    frames.delete(frameId);
+    callback(performance.now());
+    expect(note.style.getPropertyValue("fill")).toBe("rgb(240, 93, 108)");
+
+    layer.setConfig({ mode: "mask", mixColor: "#1CAEE8", mixAmount: 0.35 });
+    expect(note.style.fill).toBe("black");
+    expect(note.style.getPropertyPriority("fill")).toBe("");
+    expect(note.classList.contains("performance-mask-source")).toBe(true);
+
+    layer.dispose();
+  });
+});

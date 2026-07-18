@@ -7,9 +7,17 @@ import {
   filesInFolder,
   lastRememberedAssetFolder,
   rememberAssetFolder,
+  type RememberedDirectoryHandle,
 } from "../lib/remembered-folder";
 import { parseMidi, type MidiSummary } from "../lib/midi";
 import { extractMusicXml, summarizeMusicXml, type ScoreSummary } from "../lib/mxl";
+import {
+  PROJECT_SETTINGS_FILE_NAME,
+  findProjectSettingsFile,
+  parseProjectSettings,
+  serializeProjectSettings,
+  type ProjectSettings,
+} from "../lib/project-settings";
 
 export interface LoadedProject {
   label: string;
@@ -18,11 +26,13 @@ export interface LoadedProject {
   midi: MidiSummary;
   audioUrl: string;
   backgrounds: File[];
+  settings?: ProjectSettings;
   revokeAudioUrl?: boolean;
 }
 
 interface UseProjectLoaderOptions {
   onProjectLoaded(project: LoadedProject): void;
+  onSettingsLoaded(settings: ProjectSettings): void;
 }
 
 async function readScoreFile(file: File): Promise<string> {
@@ -31,7 +41,7 @@ async function readScoreFile(file: File): Promise<string> {
     : file.text();
 }
 
-export function useProjectLoader({ onProjectLoaded }: UseProjectLoaderOptions) {
+export function useProjectLoader({ onProjectLoaded, onSettingsLoaded }: UseProjectLoaderOptions) {
   const [project, setProject] = useState<LoadedProject | null>(null);
   const [status, setStatus] = useState("请选择素材文件夹");
   const [error, setError] = useState<string | null>(null);
@@ -39,8 +49,10 @@ export function useProjectLoader({ onProjectLoaded }: UseProjectLoaderOptions) {
   const [midiFile, setMidiFile] = useState<File | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [backgroundFiles, setBackgroundFiles] = useState<File[]>([]);
+  const [settingsFile, setSettingsFile] = useState<File | null>(null);
   const [folderName, setFolderName] = useState<string | null>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
+  const directoryHandleRef = useRef<RememberedDirectoryHandle | null>(null);
   const loadRequestRef = useRef(0);
   const remembersFolders = canRememberFolder();
 
@@ -52,6 +64,7 @@ export function useProjectLoader({ onProjectLoaded }: UseProjectLoaderOptions) {
 
   const loadLocalFiles = useCallback(async (
     assets: MatchedProjectAssets<File>,
+    projectSettingsFile: File | null,
     requestId: number,
   ) => {
     setStatus("正在解析本地文件…");
@@ -62,6 +75,17 @@ export function useProjectLoader({ onProjectLoaded }: UseProjectLoaderOptions) {
         assets.midi.arrayBuffer(),
       ]);
       if (requestId !== loadRequestRef.current) return;
+
+      let settings: ProjectSettings | undefined;
+      let settingsError: string | null = null;
+      if (projectSettingsFile) {
+        try {
+          settings = parseProjectSettings(await projectSettingsFile.text());
+        } catch (caught) {
+          settingsError = caught instanceof Error ? caught.message : String(caught);
+        }
+      }
+
       adoptProject({
         label: assets.score.name,
         musicXml,
@@ -69,9 +93,11 @@ export function useProjectLoader({ onProjectLoaded }: UseProjectLoaderOptions) {
         midi: parseMidi(midiBuffer),
         audioUrl: URL.createObjectURL(assets.audio),
         backgrounds: assets.backgrounds,
+        settings,
         revokeAudioUrl: true,
       });
-      setStatus("本地文件已加载");
+      setStatus(settings ? "素材和参数已加载" : "本地素材已加载");
+      if (settingsError) setError(`素材已加载，但参数文件读取失败：${settingsError}`);
     } catch (caught) {
       if (requestId !== loadRequestRef.current) return;
       setStatus("解析失败");
@@ -85,18 +111,21 @@ export function useProjectLoader({ onProjectLoaded }: UseProjectLoaderOptions) {
     setMidiFile(null);
     setAudioFile(null);
     setBackgroundFiles([]);
+    setSettingsFile(null);
     if (files.length === 0) {
       setStatus("尚未选择素材文件夹");
       return;
     }
     try {
       const matched = matchProjectFolderAssets(files);
+      const nextSettingsFile = findProjectSettingsFile(files);
       setScoreFile(matched.score);
       setMidiFile(matched.midi);
       setAudioFile(matched.audio);
       setBackgroundFiles(matched.backgrounds);
+      setSettingsFile(nextSettingsFile);
       setError(null);
-      void loadLocalFiles(matched, requestId);
+      void loadLocalFiles(matched, nextSettingsFile, requestId);
     } catch (caught) {
       setStatus("素材匹配失败");
       setError(caught instanceof Error ? caught.message : String(caught));
@@ -105,6 +134,7 @@ export function useProjectLoader({ onProjectLoaded }: UseProjectLoaderOptions) {
 
   const selectAssetFolder = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
+    directoryHandleRef.current = null;
     setFolderName(files?.[0]?.webkitRelativePath.split("/")[0] ?? null);
     selectAssetFolderFromFiles(files ? [...files] : []);
   }, [selectAssetFolderFromFiles]);
@@ -118,6 +148,7 @@ export function useProjectLoader({ onProjectLoaded }: UseProjectLoaderOptions) {
         setStatus(`已记住“${handle.name}”，请重新选择以授权读取。`);
         return;
       }
+      directoryHandleRef.current = handle;
       setStatus(`正在重新读取“${handle.name}”…`);
       selectAssetFolderFromFiles(await filesInFolder(handle));
     } catch (caught) {
@@ -137,6 +168,7 @@ export function useProjectLoader({ onProjectLoaded }: UseProjectLoaderOptions) {
     try {
       const handle = await chooseAssetFolder();
       await rememberAssetFolder(handle);
+      directoryHandleRef.current = handle;
       setFolderName(handle.name);
       selectAssetFolderFromFiles(await filesInFolder(handle));
     } catch (caught) {
@@ -144,6 +176,62 @@ export function useProjectLoader({ onProjectLoaded }: UseProjectLoaderOptions) {
       setError(caught instanceof Error ? caught.message : String(caught));
     }
   }, [remembersFolders, selectAssetFolderFromFiles]);
+
+  const applySettingsFile = useCallback(async (file: File) => {
+    try {
+      const settings = parseProjectSettings(await file.text());
+      setSettingsFile(file);
+      onSettingsLoaded(settings);
+      setStatus(`参数已读取：${file.name}`);
+      setError(null);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    }
+  }, [onSettingsLoaded]);
+
+  const readProjectSettings = useCallback(() => {
+    if (settingsFile) {
+      void applySettingsFile(settingsFile);
+      return;
+    }
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json,application/json";
+    input.addEventListener("change", () => {
+      const file = input.files?.[0];
+      if (file) void applySettingsFile(file);
+    }, { once: true });
+    input.click();
+  }, [applySettingsFile, settingsFile]);
+
+  const saveProjectSettings = useCallback(async (settings: ProjectSettings) => {
+    const content = serializeProjectSettings(settings);
+    const handle = directoryHandleRef.current;
+    try {
+      if (handle?.getFileHandle) {
+        let permission = await handle.queryPermission?.({ mode: "readwrite" });
+        if (permission !== "granted") permission = await handle.requestPermission?.({ mode: "readwrite" });
+        if (permission !== "granted") throw new Error("未获得素材文件夹写入权限");
+        const fileHandle = await handle.getFileHandle(PROJECT_SETTINGS_FILE_NAME, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(content);
+        await writable.close();
+        setSettingsFile(new File([content], PROJECT_SETTINGS_FILE_NAME, { type: "application/json" }));
+        setStatus(`参数已保存到素材文件夹：${PROJECT_SETTINGS_FILE_NAME}`);
+      } else {
+        const url = URL.createObjectURL(new Blob([content], { type: "application/json" }));
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = PROJECT_SETTINGS_FILE_NAME;
+        link.click();
+        URL.revokeObjectURL(url);
+        setStatus(`参数文件已导出，请将 ${PROJECT_SETTINGS_FILE_NAME} 放入素材文件夹`);
+      }
+      setError(null);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    }
+  }, []);
 
   useEffect(
     () => () => {
@@ -162,10 +250,13 @@ export function useProjectLoader({ onProjectLoaded }: UseProjectLoaderOptions) {
     midiFile,
     audioFile,
     backgroundFiles,
+    settingsFile,
     folderName,
     folderInputRef,
     remembersFolders,
     selectAssetFolder,
     chooseAndLoadAssetFolder,
+    readProjectSettings,
+    saveProjectSettings,
   };
 }

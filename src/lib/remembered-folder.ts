@@ -6,14 +6,23 @@ export interface RememberedDirectoryHandle {
   kind: "directory";
   name: string;
   entries(): AsyncIterableIterator<[string, RememberedDirectoryEntry]>;
-  queryPermission?(descriptor: { mode: "read" }): Promise<PermissionState>;
+  queryPermission?(descriptor: { mode: "read" | "readwrite" }): Promise<PermissionState>;
+  requestPermission?(descriptor: { mode: "read" | "readwrite" }): Promise<PermissionState>;
+  getFileHandle?(name: string, options: { create: boolean }): Promise<WritableFileHandle>;
 }
 
-interface RememberedDirectoryEntry {
+export interface RememberedDirectoryEntry {
   kind: "file" | "directory";
   name: string;
   getFile?(): Promise<File>;
   entries?(): AsyncIterableIterator<[string, RememberedDirectoryEntry]>;
+}
+
+interface WritableFileHandle {
+  createWritable(): Promise<{
+    write(data: Blob | string): Promise<void>;
+    close(): Promise<void>;
+  }>;
 }
 
 type DirectoryPickerWindow = Window & typeof globalThis & {

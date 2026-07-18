@@ -16,9 +16,12 @@ interface ControlPanelProps {
   midiFile: File | null;
   audioFile: File | null;
   backgroundFiles: File[];
+  settingsFile: File | null;
   folderInputRef: RefObject<HTMLInputElement | null>;
   onChooseFolder(): void;
   onSelectFolder(event: ChangeEvent<HTMLInputElement>): void;
+  onReadParameters(): void;
+  onSaveParameters(): void;
   customTitle: string;
   onCustomTitleChange(value: string): void;
   measuresPerSystem: number;
@@ -49,9 +52,12 @@ export function ControlPanel({
   midiFile,
   audioFile,
   backgroundFiles,
+  settingsFile,
   folderInputRef,
   onChooseFolder,
   onSelectFolder,
+  onReadParameters,
+  onSaveParameters,
   customTitle,
   onCustomTitleChange,
   measuresPerSystem,
@@ -106,6 +112,13 @@ export function ControlPanel({
             </div>
           </div>
         )}
+        <div className="parameter-file-actions">
+          <button type="button" onClick={onSaveParameters} disabled={!project}>保存参数</button>
+          <button type="button" onClick={onReadParameters}>读取参数</button>
+        </div>
+        <small className="parameter-file-status">
+          {settingsFile ? `已发现：${settingsFile.name}` : "参数文件：melody-rain.settings.json"}
+        </small>
       </div>
 
       <label className="title-control">

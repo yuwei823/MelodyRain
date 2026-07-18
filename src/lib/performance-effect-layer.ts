@@ -132,7 +132,7 @@ export class PerformanceEffectLayer {
   private maskClones: MaskClone[] = [];
   private maskSources: SVGGraphicsElement[] = [];
   private paints: PerformancePaintAssignment[] = [];
-  private config: PerformanceEffectConfig = { mode: "mask", mixColor: "#1CAEE8", mixAmount: 0.35 };
+  private config: PerformanceEffectConfig = { mode: "mask", mixColor: "#1CAEE8", mixAmount: 0.5 };
   private rainbowPreparationIndex = 0;
   private rainbowPreparationFrame: number | null = null;
   private rainbowReady = false;
@@ -192,7 +192,13 @@ export class PerformanceEffectLayer {
     this.config = { ...config, mixAmount: clampUnit(config.mixAmount) };
     this.tintRect.setAttribute("fill", this.config.mixColor);
     this.tintRect.setAttribute("opacity", String(this.config.mixAmount));
-    if (changedMode) this.applyMode();
+    if (changedMode) {
+      // Rainbow paint is written as inline `!important` SVG paint. Keeping it
+      // underneath the mask can leak color during compositor-only scrolling,
+      // so mask mode must always restore the source SVG's original paint.
+      if (this.config.mode === "mask") this.clearRainbowPaints();
+      this.applyMode();
+    }
     else if (this.config.mode === "mask") this.update();
   }
 
@@ -314,11 +320,11 @@ export class PerformanceEffectLayer {
   private startRainbowPreparation(): void {
     this.rainbowPreparationIndex = 0;
     this.rainbowReady = this.paints.length === 0;
-    if (!this.rainbowReady) this.scheduleRainbowPreparation();
+    if (this.config.mode === "rainbow" && !this.rainbowReady) this.scheduleRainbowPreparation();
   }
 
   private scheduleRainbowPreparation(): void {
-    if (this.rainbowReady || this.rainbowPreparationFrame !== null) return;
+    if (this.config.mode !== "rainbow" || this.rainbowReady || this.rainbowPreparationFrame !== null) return;
     this.rainbowPreparationFrame = requestAnimationFrame(() => {
       this.rainbowPreparationFrame = null;
       const startedAt = performance.now();

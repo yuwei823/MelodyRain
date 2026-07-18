@@ -109,17 +109,19 @@ export class ScoreMaskLayer {
     const defs = createSvgElement("defs");
     this.paperClip.id = this.paperClipId;
     this.paperClipRect.classList.add("score-paper-clip");
+    this.paperClipRect.setAttribute("rx", "16");
+    this.paperClipRect.setAttribute("ry", "16");
     this.paperClip.append(this.paperClipRect);
     defs.append(this.mask, this.paperClip);
     this.backgroundImage.setAttribute("preserveAspectRatio", "xMidYMid slice");
     this.paperRect.setAttribute("fill", "#eef1f5");
-    this.paperRect.setAttribute("opacity", "1");
+    this.paperRect.setAttribute("opacity", "0.9");
     this.colorRect.setAttribute("mask", `url(#${this.maskId})`);
     this.image.setAttribute("mask", `url(#${this.maskId})`);
     this.image.setAttribute("preserveAspectRatio", "xMidYMid slice");
     this.blackMixRect.setAttribute("fill", "black");
     this.blackMixRect.setAttribute("mask", `url(#${this.maskId})`);
-    this.blackMixRect.setAttribute("opacity", "0");
+    this.blackMixRect.setAttribute("opacity", "0.4");
     this.foreground.setAttribute("clip-path", `url(#${this.paperClipId})`);
     this.foreground.append(this.paperRect, this.colorRect, this.image, this.blackMixRect);
     this.svg.append(
