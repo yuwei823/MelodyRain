@@ -29,6 +29,7 @@ interface RenderedRainSymbol {
 
 const FALL_DURATION_MS = 1_200;
 const FALL_DISTANCE_PX = 180;
+const HIT_DURATION_MS = 200;
 const MAX_TIME_DISTANCE_QUARTERS = 0.2;
 
 function easeInCubic(value: number): number {
@@ -191,7 +192,7 @@ export class RainLayer {
       const isVisible = timeMs >= startMs;
       const rawProgress = Math.max(0, Math.min(1, (timeMs - startMs) / FALL_DURATION_MS));
       const fallOffset = -FALL_DISTANCE_PX * (1 - easeInCubic(rawProgress));
-      const isHit = timeMs >= attackMs && timeMs < attackMs + 260;
+      const isHit = timeMs >= attackMs && timeMs < attackMs + HIT_DURATION_MS;
       const isLanded = timeMs >= attackMs;
 
       const visibility = isVisible ? "visible" : "hidden";

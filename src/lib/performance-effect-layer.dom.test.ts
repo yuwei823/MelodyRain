@@ -72,6 +72,15 @@ describe("PerformanceEffectLayer mode isolation", () => {
     expect(note.style.fill).toBe("black");
     expect(frames.size).toBe(0);
 
+    const hitGlow = viewport.querySelector<SVGGraphicsElement>(".performance-mask-hit-glow");
+    expect(hitGlow).not.toBeNull();
+    note.classList.add("is-hit");
+    layer.update();
+    expect(hitGlow!.classList.contains("is-active")).toBe(true);
+    note.classList.remove("is-hit");
+    layer.update();
+    expect(hitGlow!.classList.contains("is-active")).toBe(false);
+
     layer.setConfig({ mode: "rainbow", mixColor: "#1CAEE8", mixAmount: 0.35 });
     expect(frames.size).toBe(1);
     const [frameId, callback] = frames.entries().next().value!;

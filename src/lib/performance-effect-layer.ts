@@ -74,6 +74,7 @@ interface MaskClone {
   source: SVGGraphicsElement;
   container: SVGGElement;
   content: SVGGraphicsElement;
+  hitGlow: SVGGraphicsElement;
   baseTop: number;
   baseBottom: number;
 }
@@ -208,7 +209,7 @@ export class PerformanceEffectLayer {
       getComputedStyle(this.viewport).getPropertyValue("--score-camera-offset-y"),
     ) || 0;
     const margin = 220;
-    this.maskClones.forEach(({ source, container, content, baseTop, baseBottom }) => {
+    this.maskClones.forEach(({ source, container, content, hitGlow, baseTop, baseBottom }) => {
       const insideViewport = baseBottom + cameraOffset >= -margin
         && baseTop + cameraOffset <= this.viewport.clientHeight + margin;
       if (!insideViewport) {
@@ -226,9 +227,15 @@ export class PerformanceEffectLayer {
       content.style.transformOrigin = source.style.transformOrigin || "0 0";
       content.style.opacity = style.opacity;
       content.style.clipPath = source.style.clipPath;
-      // Keep the source's animated landing glow without restoring its blue/purple fill.
-      // The clone geometry remains white, so the filter only affects the mask edge.
-      content.style.filter = style.filter;
+      const isHit = source.classList.contains("is-hit");
+      // Keep the stable landed edge on the base clone. Hit brightness and
+      // saturation cannot affect a white alpha mask, so the peak is rendered
+      // by a separate expanding glow clone instead.
+      content.style.filter = isHit ? "drop-shadow(0 0 1px white)" : style.filter;
+      hitGlow.style.transform = source.style.transform;
+      hitGlow.style.transformOrigin = source.style.transformOrigin || "0 0";
+      hitGlow.style.clipPath = source.style.clipPath;
+      hitGlow.classList.toggle("is-active", isHit);
     });
   }
 
@@ -428,11 +435,15 @@ export class PerformanceEffectLayer {
         `matrix(${matrix.a} ${matrix.b} ${matrix.c} ${matrix.d} ${matrix.e - viewportBounds.left} ${matrix.f - viewportBounds.top - cameraOffset})`,
       );
     }
-    container.append(content);
+    const hitGlow = content.cloneNode(true) as SVGGraphicsElement;
+    hitGlow.classList.add("performance-mask-hit-glow");
+    hitGlow.style.opacity = "0";
+    container.append(content, hitGlow);
     return {
       source,
       container,
       content,
+      hitGlow,
       baseTop: bounds.top - viewportBounds.top - cameraOffset,
       baseBottom: bounds.bottom - viewportBounds.top - cameraOffset,
     };

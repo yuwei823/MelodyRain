@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   removePedalMarkings,
+  removeOctaveShiftMarkings,
   removeTupletMarkings,
   sanitizeScoreMusicXml,
 } from "./score-sanitizer";
@@ -53,5 +54,19 @@ describe("score sanitizer", () => {
 
     expect(sanitized).not.toMatch(/<(?:m:)?(?:pedal|tuplet)\b/i);
     expect(sanitized).toContain("<m:note>");
+  });
+
+  it("removes 8va and 8vb display directions while preserving notes", () => {
+    const xml = `<measure>
+      <direction placement="above"><direction-type><octave-shift type="down" size="8" number="1"/></direction-type><staff>1</staff></direction>
+      <note><pitch><step>C</step><octave>6</octave></pitch><duration>4</duration></note>
+      <direction placement="below"><direction-type><octave-shift type="stop" size="8" number="1"/></direction-type><staff>1</staff></direction>
+    </measure>`;
+    const sanitized = removeOctaveShiftMarkings(xml);
+
+    expect(sanitized).not.toMatch(/<octave-shift\b/i);
+    expect(sanitized).not.toMatch(/<direction\b/i);
+    expect(sanitized).toContain("<octave>6</octave>");
+    expect(sanitized).toContain("<duration>4</duration>");
   });
 });
