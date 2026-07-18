@@ -1,11 +1,3 @@
-@font-face {
-  font-family: "Melody Source Han Serif";
-  src: local("Source Han Serif SC"), local("Noto Serif CJK SC"), url("./assets/fonts/SourceHanSerifSC-VF.woff2") format("woff2-variations");
-  font-style: normal;
-  font-weight: 200 900;
-  font-display: swap;
-}
-
 :root {
   font-family: Inter, "Segoe UI Variable", "Microsoft YaHei", sans-serif;
   color: #eaf2ff;
@@ -115,7 +107,7 @@ button { color: inherit; }
 .frame-caption { width: min(100%, 540px); display: flex; align-items: center; justify-content: center; gap: 9px; color: #758aa1; font-size: 10px; letter-spacing: .04em; }
 .frame-caption strong { color: #c8d8e9; font-size: 11px; }
 .stage-toolbar { position: absolute; z-index: 4; inset: 0 0 auto; min-height: var(--score-toolbar-height); display: grid; place-items: center; }
-.stage-toolbar h2 { color: #25364a; font-family: "Melody Source Han Serif", "Songti SC", SimSun, serif; font-weight: 650; letter-spacing: .025em; text-align: center; transform: translateY(10px); }
+.stage-toolbar h2 { color: #25364a; font-family: "Source Han Serif SC VF", "Source Han Serif SC", "Noto Serif SC", "Noto Serif CJK SC", "Songti SC", STSong, SimSun, NSimSun, FangSong, Georgia, serif; font-weight: 650; letter-spacing: .025em; text-align: center; transform: translateY(10px); }
 .transport-stats { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
 .transport-stats span { padding: 7px 10px; border-radius: 8px; background: rgba(123, 166, 203, .08); color: #9fb3c8; font-size: 11px; font-variant-numeric: tabular-nums; }
 .score-viewport { position: relative; min-height: 0; flex: 1; overflow: hidden; isolation: isolate; background: #eef1f5; scrollbar-color: #5d7188 transparent; }
