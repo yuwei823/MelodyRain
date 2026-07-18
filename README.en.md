@@ -19,6 +19,8 @@ The current version focuses on portrait-format previews in the browser. Video ex
 - Allows 1–6 measures per system;
 - Saves project parameters to `melody-rain.settings.json` and restores them when the asset folder is loaded again.
 
+When no project settings file is loaded, the visual defaults are `40%` score-mask black mixing, `10%` paper transparency, and `50%` performance-mask color mixing.
+
 ## Requirements
 
 - Node.js `>=20.19 <27`
