@@ -94,7 +94,7 @@ export class ScoreMaskLayer {
 
   constructor(
     private readonly viewport: HTMLElement,
-    private readonly scoreHost: HTMLElement,
+    scoreHost: HTMLElement,
   ) {
     this.overlay.className = "score-mask-layer";
     this.overlay.setAttribute("aria-hidden", "true");
@@ -230,9 +230,13 @@ export class ScoreMaskLayer {
   }
 
   private renderGeometry(): void {
-    const hostBounds = this.scoreHost.getBoundingClientRect();
-    const hostLeft = hostBounds.left - this.scoreHost.offsetLeft;
-    const hostTop = hostBounds.top - this.scoreHost.offsetTop;
+    // Use the shared viewport as the coordinate origin. Deriving it from
+    // scoreHost.offsetTop only works while the host is a direct child; the
+    // fixed clipping wrapper and its internal top spacing introduce another
+    // offset layer that would otherwise shift the static mask by 78px.
+    const viewportBounds = this.viewport.getBoundingClientRect();
+    const hostLeft = viewportBounds.left;
+    const hostTop = viewportBounds.top;
     const clones = this.sources.flatMap((source) => {
       if (!source.element.isConnected) return [];
       const matrix = source.element.getScreenCTM();

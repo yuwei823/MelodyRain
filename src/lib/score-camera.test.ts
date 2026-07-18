@@ -16,8 +16,8 @@ describe("vertical score camera", () => {
     expect(verticalCameraOffset(anchors, 0, 600, 1_500)).toBe(0);
   });
 
-  it("keeps the active system at the viewport midpoint while there is remaining score below", () => {
-    expect(verticalCameraOffset(anchors, 8, 600, 1_500)).toBe(560);
+  it("keeps the active system at the configured vertical focal line while score remains below", () => {
+    expect(verticalCameraOffset(anchors, 8, 600, 1_500)).toBeCloseTo(711.7647);
   });
 
   it("does not move for each note within the same system", () => {

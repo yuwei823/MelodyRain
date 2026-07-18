@@ -21,7 +21,9 @@ export function StagePanel({ title, scoreViewportRef, scoreHostRef }: StagePanel
             <div><h2>{title}</h2></div>
           </div>
           <div ref={scoreViewportRef} className="score-viewport">
-            <div ref={scoreHostRef} className="score-host" aria-label="SVG 五线谱预览" />
+            <div className="score-content-clip">
+              <div ref={scoreHostRef} className="score-host" aria-label="SVG 五线谱预览" />
+            </div>
           </div>
         </div>
         <div className="frame-caption">
