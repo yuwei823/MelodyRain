@@ -7,11 +7,13 @@ export interface MatchedProjectAssets<T extends FolderAsset> {
   score: T;
   midi: T;
   audio: T;
+  backgrounds: T[];
 }
 
 const SCORE_EXTENSIONS = [".mxl", ".musicxml", ".xml"];
 const MIDI_EXTENSIONS = [".mid", ".midi"];
 const AUDIO_EXTENSIONS = [".mp3"];
+const IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp", ".avif"];
 
 function extension(name: string): string {
   const dot = name.lastIndexOf(".");
@@ -34,6 +36,19 @@ function sortByExtensionPriority<T extends FolderAsset>(assets: T[], extensions:
   });
 }
 
+function sortBackgrounds<T extends FolderAsset>(assets: T[], projectStem?: string): T[] {
+  const preferredNames = new Set(["background", "bg", "cover"]);
+  return [...assets].sort((left, right) => {
+    const rank = (asset: T): number => {
+      const candidateStem = stem(asset.name);
+      if (projectStem && candidateStem === projectStem) return 0;
+      if (preferredNames.has(candidateStem)) return 1;
+      return 2;
+    };
+    return rank(left) - rank(right) || displayPath(left).localeCompare(displayPath(right));
+  });
+}
+
 export function matchProjectFolderAssets<T extends FolderAsset>(files: T[]): MatchedProjectAssets<T> {
   const visibleFiles = files.filter((file) => !file.name.startsWith(".") && !file.name.startsWith("~$"));
   const scores = sortByExtensionPriority(
@@ -48,6 +63,7 @@ export function matchProjectFolderAssets<T extends FolderAsset>(files: T[]): Mat
     visibleFiles.filter((file) => AUDIO_EXTENSIONS.includes(extension(file.name))),
     AUDIO_EXTENSIONS,
   );
+  const images = visibleFiles.filter((file) => IMAGE_EXTENSIONS.includes(extension(file.name)));
 
   const missing: string[] = [];
   if (scores.length === 0) missing.push("MXL/MusicXML");
@@ -65,6 +81,7 @@ export function matchProjectFolderAssets<T extends FolderAsset>(files: T[]): Mat
       score: scores.find((file) => stem(file.name) === selectedStem)!,
       midi: midis.find((file) => stem(file.name) === selectedStem)!,
       audio: audios.find((file) => stem(file.name) === selectedStem)!,
+      backgrounds: sortBackgrounds(images, selectedStem),
     };
   }
 
@@ -73,7 +90,12 @@ export function matchProjectFolderAssets<T extends FolderAsset>(files: T[]): Mat
   }
 
   if (scores.length === 1 && midis.length === 1 && audios.length === 1) {
-    return { score: scores[0]!, midi: midis[0]!, audio: audios[0]! };
+    return {
+      score: scores[0]!,
+      midi: midis[0]!,
+      audio: audios[0]!,
+      backgrounds: sortBackgrounds(images, stem(scores[0]!.name)),
+    };
   }
 
   throw new Error("素材文件夹内存在多个候选文件，且文件名无法组成唯一的一组资源");

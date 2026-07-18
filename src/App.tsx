@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatDuration } from "./lib/format";
-import { assetRelativePath, matchProjectFolderAssets } from "./lib/asset-folder";
+import {
+  assetRelativePath,
+  matchProjectFolderAssets,
+  type MatchedProjectAssets,
+} from "./lib/asset-folder";
 import {
   canReadFolder,
   canRememberFolder,
@@ -15,6 +19,7 @@ import { RainLayer } from "./lib/rain-layer";
 import { PORTRAIT_ASPECT_RATIO, PORTRAIT_RENDER_PROFILE } from "./lib/render-profile";
 import { ScoreRenderer } from "./lib/score-renderer";
 import { ScoreCamera } from "./lib/score-camera";
+import { ScoreMaskLayer, type ScoreMaskSource } from "./lib/score-mask-layer";
 import { ScoreTimelineLayer } from "./lib/score-timeline-layer";
 import { MediaTransport, TRANSPORT_PRE_ROLL_MS, type TransportSnapshot } from "./lib/transport";
 
@@ -24,8 +29,11 @@ interface LoadedProject {
   score: ScoreSummary;
   midi: MidiSummary;
   audioUrl: string;
+  backgrounds: File[];
   revokeAudioUrl?: boolean;
 }
+
+type BackgroundMode = "image" | "color";
 
 const EMPTY_SNAPSHOT: TransportSnapshot = {
   state: "idle",
@@ -56,9 +64,16 @@ export default function App() {
   const [scoreFile, setScoreFile] = useState<File | null>(null);
   const [midiFile, setMidiFile] = useState<File | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [backgroundFiles, setBackgroundFiles] = useState<File[]>([]);
   const [folderName, setFolderName] = useState<string | null>(null);
   const [customTitle, setCustomTitle] = useState("");
   const [measuresPerSystem, setMeasuresPerSystem] = useState(PORTRAIT_RENDER_PROFILE.measuresPerSystem);
+  const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>("color");
+  const [backgroundColor, setBackgroundColor] = useState("#000000");
+  const [maskBlackMixPercent, setMaskBlackMixPercent] = useState(0);
+  const [paperTransparencyPercent, setPaperTransparencyPercent] = useState(0);
+  const [selectedBackgroundIndex, setSelectedBackgroundIndex] = useState(0);
+  const [backgroundImageUrl, setBackgroundImageUrl] = useState<string | null>(null);
   const scoreHostRef = useRef<HTMLDivElement>(null);
   const scoreViewportRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -66,6 +81,7 @@ export default function App() {
   const rainLayerRef = useRef<RainLayer | null>(null);
   const scoreTimelineLayerRef = useRef<ScoreTimelineLayer | null>(null);
   const scoreCameraRef = useRef<ScoreCamera | null>(null);
+  const scoreMaskLayerRef = useRef<ScoreMaskLayer | null>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
 
   const adoptProject = useCallback((nextProject: LoadedProject) => {
@@ -74,9 +90,34 @@ export default function App() {
       return nextProject;
     });
     setCustomTitle("");
+    setSelectedBackgroundIndex(0);
+    setBackgroundMode(nextProject.backgrounds.length > 0 ? "image" : "color");
     setSnapshot(EMPTY_SNAPSHOT);
     setError(null);
   }, []);
+
+  const selectedBackgroundFile = project?.backgrounds[selectedBackgroundIndex] ?? null;
+  useEffect(() => {
+    if (!selectedBackgroundFile) {
+      setBackgroundImageUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(selectedBackgroundFile);
+    setBackgroundImageUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [selectedBackgroundFile]);
+
+  const maskSource = useMemo<ScoreMaskSource>(() => (
+    backgroundMode === "image" && backgroundImageUrl
+      ? { kind: "image", url: backgroundImageUrl }
+      : { kind: "color", color: backgroundColor }
+  ), [backgroundColor, backgroundImageUrl, backgroundMode]);
+  const maskSourceRef = useRef<ScoreMaskSource>(maskSource);
+  maskSourceRef.current = maskSource;
+  const maskBlackMixPercentRef = useRef(maskBlackMixPercent);
+  maskBlackMixPercentRef.current = maskBlackMixPercent;
+  const paperTransparencyPercentRef = useRef(paperTransparencyPercent);
+  paperTransparencyPercentRef.current = paperTransparencyPercent;
 
   useEffect(() => {
     const host = scoreHostRef.current;
@@ -88,13 +129,15 @@ export default function App() {
     scoreTimelineLayerRef.current = null;
     scoreCameraRef.current?.dispose();
     scoreCameraRef.current = null;
+    scoreMaskLayerRef.current?.dispose();
+    scoreMaskLayerRef.current = null;
     host.replaceChildren();
     setTargetCount(0);
     setStatus("正在排版 SVG 五线谱…");
     const renderer = new ScoreRenderer(host);
     void renderer
       .render(project.musicXml, measuresPerSystem, PORTRAIT_RENDER_PROFILE.scoreScale)
-      .then(({ targets, restSymbols, revealElements, growingSpans }) => {
+      .then(({ targets, restSymbols, revealElements, growingSpans, maskElements }) => {
         if (cancelled) return;
         const timeline = new MidiTimeline(project.midi);
         const rainLayer = new RainLayer(host, timeline);
@@ -110,6 +153,12 @@ export default function App() {
         scoreTimelineLayerRef.current = scoreTimelineLayer;
         const viewport = scoreViewportRef.current;
         if (viewport) {
+          const scoreMaskLayer = new ScoreMaskLayer(viewport, host);
+          scoreMaskLayer.setElements(maskElements);
+          scoreMaskLayer.setSource(maskSourceRef.current);
+          scoreMaskLayer.setBlackMix(maskBlackMixPercentRef.current / 100);
+          scoreMaskLayer.setPaperTransparency(paperTransparencyPercentRef.current / 100);
+          scoreMaskLayerRef.current = scoreMaskLayer;
           const scoreCamera = new ScoreCamera(viewport, host);
           scoreCamera.setAnchors([
             ...targets.map((target) => ({ scoreQuarter: target.scoreQuarter, x: target.x, y: target.y })),
@@ -132,8 +181,22 @@ export default function App() {
       scoreTimelineLayerRef.current = null;
       scoreCameraRef.current?.dispose();
       scoreCameraRef.current = null;
+      scoreMaskLayerRef.current?.dispose();
+      scoreMaskLayerRef.current = null;
     };
   }, [project, measuresPerSystem]);
+
+  useEffect(() => {
+    scoreMaskLayerRef.current?.setSource(maskSource);
+  }, [maskSource]);
+
+  useEffect(() => {
+    scoreMaskLayerRef.current?.setBlackMix(maskBlackMixPercent / 100);
+  }, [maskBlackMixPercent]);
+
+  useEffect(() => {
+    scoreMaskLayerRef.current?.setPaperTransparency(paperTransparencyPercent / 100);
+  }, [paperTransparencyPercent]);
 
   useEffect(() => {
     rainLayerRef.current?.update(snapshot.sourceTimeMs);
@@ -194,6 +257,7 @@ export default function App() {
     setScoreFile(null);
     setMidiFile(null);
     setAudioFile(null);
+    setBackgroundFiles([]);
     if (files.length === 0) {
       setStatus("尚未选择素材文件夹");
       return;
@@ -203,6 +267,7 @@ export default function App() {
       setScoreFile(matched.score);
       setMidiFile(matched.midi);
       setAudioFile(matched.audio);
+      setBackgroundFiles(matched.backgrounds);
       setError(null);
       void loadLocalFiles(matched);
     } catch (caught) {
@@ -232,9 +297,9 @@ export default function App() {
     }
   };
 
-  const loadLocalFiles = async (matchedAssets?: { score: File; midi: File; audio: File }) => {
+  const loadLocalFiles = async (matchedAssets?: MatchedProjectAssets<File>) => {
     const assets = matchedAssets ?? (scoreFile && midiFile && audioFile
-      ? { score: scoreFile, midi: midiFile, audio: audioFile }
+      ? { score: scoreFile, midi: midiFile, audio: audioFile, backgrounds: backgroundFiles }
       : null);
     if (!assets) {
       setError("请选择包含 MXL/MusicXML、MIDI 和 MP3 的素材文件夹");
@@ -250,6 +315,7 @@ export default function App() {
         score: summarizeMusicXml(musicXml),
         midi: parseMidi(midiBuffer),
         audioUrl: URL.createObjectURL(assets.audio),
+        backgrounds: assets.backgrounds,
         revokeAudioUrl: true,
       });
       setStatus("本地文件已加载");
@@ -307,13 +373,17 @@ export default function App() {
               aria-label="选择素材文件夹"
             />
             <p>{canRememberFolder()
-              ? "将记住此文件夹，并在刷新后自动重新读取 MXL/MusicXML、MIDI 和 MP3。"
-              : "自动匹配同名的 MXL/MusicXML、MIDI 和 MP3。"}</p>
-            {(scoreFile || midiFile || audioFile) && (
+              ? "将记住此文件夹，并在刷新后自动重新读取乐谱、MIDI、MP3 和背景图片。"
+              : "自动匹配同名的 MXL/MusicXML、MIDI 和 MP3，并读取背景图片。"}</p>
+            {(scoreFile || midiFile || audioFile || backgroundFiles.length > 0) && (
               <div className="matched-assets">
                 <div><span>乐谱</span><strong>{scoreFile ? assetRelativePath(scoreFile) : "缺失"}</strong></div>
                 <div><span>MIDI</span><strong>{midiFile ? assetRelativePath(midiFile) : "缺失"}</strong></div>
                 <div><span>MP3</span><strong>{audioFile ? assetRelativePath(audioFile) : "缺失"}</strong></div>
+                <div>
+                  <span>背景</span>
+                  <strong>{backgroundFiles.length > 0 ? `${backgroundFiles.length} 张图片` : "纯色 #000000"}</strong>
+                </div>
               </div>
             )}
           </div>
@@ -335,6 +405,83 @@ export default function App() {
               onChange={(event) => setMeasuresPerSystem(Number(event.target.value))}
             />
             <p>乐谱按原尺寸的 2/3 显示，竖屏默认每行 2 个小节；首行自然排版，后续各行与首行栏线对齐。</p>
+          </div>
+
+          <div className="background-control">
+            <div>
+              <p className="step-label">MASK SOURCE</p>
+              <strong>谱面蒙版背景</strong>
+            </div>
+            <div className="background-mode" aria-label="蒙版背景模式">
+              <button
+                type="button"
+                aria-pressed={backgroundMode === "image"}
+                disabled={!project?.backgrounds.length}
+                onClick={() => setBackgroundMode("image")}
+              >
+                图片
+              </button>
+              <button
+                type="button"
+                aria-pressed={backgroundMode === "color"}
+                onClick={() => setBackgroundMode("color")}
+              >
+                纯色
+              </button>
+            </div>
+            {backgroundMode === "image" && project?.backgrounds.length ? (
+              <label>
+                <span>背景图片</span>
+                <select
+                  value={selectedBackgroundIndex}
+                  onChange={(event) => setSelectedBackgroundIndex(Number(event.target.value))}
+                >
+                  {project.backgrounds.map((background, index) => (
+                    <option value={index} key={assetRelativePath(background)}>
+                      {assetRelativePath(background)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <label className="color-control">
+                <span>背景颜色</span>
+                <input
+                  type="color"
+                  value={backgroundColor}
+                  onChange={(event) => setBackgroundColor(event.target.value)}
+                  aria-label="蒙版背景颜色"
+                />
+                <output>{backgroundColor.toUpperCase()}</output>
+              </label>
+            )}
+            <label className="black-mix-control">
+              <span>黑色混入</span>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value={maskBlackMixPercent}
+                onChange={(event) => setMaskBlackMixPercent(Number(event.target.value))}
+                aria-label="蒙版黑色混入比例"
+              />
+              <output>{maskBlackMixPercent}%</output>
+            </label>
+            <label className="paper-transparency-control">
+              <span>谱纸透明度</span>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value={paperTransparencyPercent}
+                onChange={(event) => setPaperTransparencyPercent(Number(event.target.value))}
+                aria-label="浅色谱纸透明度"
+              />
+              <output>{paperTransparencyPercent}%</output>
+            </label>
+            <small>图片固定在画面中并居中裁切，以最短边撑满谱面视口。</small>
           </div>
 
           <label className="title-control">

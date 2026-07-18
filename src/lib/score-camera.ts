@@ -94,12 +94,14 @@ export class ScoreCamera {
       this.viewport.clientHeight,
       this.scoreHost.scrollHeight,
     );
-    this.scoreHost.style.transform = `translateY(${-offset}px)`;
+    this.viewport.style.setProperty("--score-camera-offset-y", `${-offset}px`);
+    this.scoreHost.style.transform = "translateY(var(--score-camera-offset-y))";
   }
 
   dispose(): void {
     this.observer.disconnect();
     this.scoreHost.style.removeProperty("transform");
+    this.viewport.style.removeProperty("--score-camera-offset-y");
     this.anchors = [];
   }
 }

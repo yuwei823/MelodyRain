@@ -1,5 +1,6 @@
 import { OpenSheetMusicDisplay } from "opensheetmusicdisplay";
 import { applyMeasuresPerSystem } from "./score-layout";
+import { collectVisibleScoreMaskElements } from "./score-mask-layer";
 
 export interface ScoreTarget {
   id: string;
@@ -61,6 +62,7 @@ export interface ScoreRenderResult {
   revealElements: TimedScoreElement[];
   growingSpans: TimedScoreSpan[];
   tieContinuations: TimedTieContinuation[];
+  maskElements: SVGGraphicsElement[];
 }
 
 interface SvgBackedGraphicalNote {
@@ -108,7 +110,8 @@ export class ScoreRenderer {
     const { targets, restSymbols } = this.collectTargets();
     const { revealElements, growingSpans } = this.collectTimedScoreElements(targets);
     const tieContinuations = this.collectTieContinuations(targets);
-    return { targets, restSymbols, revealElements, growingSpans, tieContinuations };
+    const maskElements = collectVisibleScoreMaskElements(this.container);
+    return { targets, restSymbols, revealElements, growingSpans, tieContinuations, maskElements };
   }
 
   private matchMeasureWidthsToFirstSystem(): boolean {

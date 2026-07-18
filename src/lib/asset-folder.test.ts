@@ -17,6 +17,20 @@ describe("project asset folder matching", () => {
     expect(matched.score.name).toBe("cruel-summer.mxl");
     expect(matched.midi.name).toBe("cruel-summer.mid");
     expect(matched.audio.name).toBe("cruel-summer.mp3");
+    expect(matched.backgrounds).toEqual([]);
+  });
+
+  it("collects supported background images and prefers the project-stem image", () => {
+    const matched = matchProjectFolderAssets([
+      asset("song.mxl"), asset("song.mid"), asset("song.mp3"),
+      asset("zebra.webp"), asset("cover.jpg"), asset("song.png"), asset("ignored.gif"),
+    ]);
+
+    expect(matched.backgrounds.map((background) => background.name)).toEqual([
+      "song.png",
+      "cover.jpg",
+      "zebra.webp",
+    ]);
   });
 
   it("reports every missing required format", () => {
