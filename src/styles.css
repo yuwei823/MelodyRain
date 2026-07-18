@@ -1,3 +1,11 @@
+@font-face {
+  font-family: "Melody Source Han Serif";
+  src: local("Source Han Serif SC"), local("Noto Serif CJK SC"), url("./assets/fonts/SourceHanSerifSC-VF.woff2") format("woff2-variations");
+  font-style: normal;
+  font-weight: 200 900;
+  font-display: swap;
+}
+
 :root {
   font-family: Inter, "Segoe UI Variable", "Microsoft YaHei", sans-serif;
   color: #eaf2ff;
@@ -74,6 +82,11 @@ button { color: inherit; }
 .title-control input::placeholder { color: #657b92; }
 .title-control input:focus { border-color: rgba(103, 214, 255, .65); box-shadow: 0 0 0 3px rgba(103, 214, 255, .08); }
 .title-control small { color: #6f859c; font-size: 10px; }
+.title-color-control { display: grid; grid-template-columns: 74px 38px minmax(0, 1fr) auto; align-items: center; gap: 8px; margin-top: 4px; color: #8da2b8; font-size: 10px; }
+.title-control .title-color-control input { width: 38px; height: 30px; padding: 2px; border-radius: 7px; background: transparent; cursor: pointer; }
+.title-color-control output { color: #a9bed3; font-variant-numeric: tabular-nums; }
+.title-color-control button { padding: 6px 9px; border: 1px solid rgba(151, 190, 224, .2); border-radius: 7px; background: rgba(0, 0, 0, .16); color: #7890a8; cursor: pointer; font-size: 10px; }
+.title-color-control button[aria-pressed="true"] { border-color: rgba(103, 214, 255, .42); background: #294a67; color: white; }
 .folder-picker { display: grid; gap: 8px; }
 .folder-picker label { display: grid; gap: 5px; color: #91a5bb; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .folder-picker input { width: 100%; padding: 8px; border: 1px dashed rgba(154, 191, 224, .22); border-radius: 9px; color: #8599af; background: rgba(0,0,0,.12); font-size: 11px; }
@@ -98,21 +111,21 @@ button { color: inherit; }
 
 .stage-panel { grid-area: stage; min-width: 0; overflow: hidden; border-radius: 20px; }
 .stage-preview-wrap { display: grid; justify-items: center; gap: 12px; padding: 22px; background: rgba(5, 12, 23, .62); }
-.portrait-frame { position: relative; width: min(100%, 540px); display: flex; flex-direction: column; overflow: hidden; border: 1px solid rgba(151, 190, 224, .24); border-radius: 16px; background: #eef1f5; box-shadow: 0 28px 70px rgba(0, 0, 0, .38); }
+.portrait-frame { position: relative; width: min(100%, 540px); display: flex; flex-direction: column; overflow: hidden; border: 1px solid rgba(151, 190, 224, .24); border-radius: 16px; background: #eef1f5; box-shadow: 0 28px 70px rgba(0, 0, 0, .38); --score-toolbar-height: 78px; --score-content-inset-top: 32px; --score-paper-inset-right: 10px; --score-paper-inset-bottom: 10px; --score-paper-inset-left: 10px; }
 .frame-caption { width: min(100%, 540px); display: flex; align-items: center; justify-content: center; gap: 9px; color: #758aa1; font-size: 10px; letter-spacing: .04em; }
 .frame-caption strong { color: #c8d8e9; font-size: 11px; }
-.stage-toolbar { position: absolute; z-index: 4; inset: 0 0 auto; min-height: 78px; display: grid; place-items: center; margin-top: 10px;}
-.stage-toolbar h2 { color: #25364a; text-align: center; }
+.stage-toolbar { position: absolute; z-index: 4; inset: 0 0 auto; min-height: var(--score-toolbar-height); display: grid; place-items: center; }
+.stage-toolbar h2 { color: #25364a; font-family: "Melody Source Han Serif", "Songti SC", SimSun, serif; font-weight: 650; letter-spacing: .025em; text-align: center; transform: translateY(10px); }
 .transport-stats { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
 .transport-stats span { padding: 7px 10px; border-radius: 8px; background: rgba(123, 166, 203, .08); color: #9fb3c8; font-size: 11px; font-variant-numeric: tabular-nums; }
-.score-viewport { position: relative; min-height: 0; flex: 1; overflow: hidden; isolation: isolate; background: #eef1f5; scrollbar-color: #5d7188 transparent; --score-paper-inset-top: 78px; --score-content-inset-top: 32px; --score-paper-inset-right: 10px; --score-paper-inset-bottom: 10px; --score-paper-inset-left: 10px; }
-.score-content-clip { position: absolute; z-index: 2; inset: var(--score-paper-inset-top) 0 0; overflow: hidden; }
+.score-viewport { position: relative; min-height: 0; flex: 1; overflow: hidden; isolation: isolate; background: #eef1f5; scrollbar-color: #5d7188 transparent; }
+.score-content-clip { position: absolute; z-index: 2; inset: var(--score-toolbar-height) 0 0; overflow: hidden; }
 .score-host { position: relative; min-height: calc(100% - var(--score-content-inset-top) - var(--score-paper-inset-bottom)); margin: var(--score-content-inset-top) var(--score-paper-inset-right) var(--score-paper-inset-bottom) var(--score-paper-inset-left); color: #10151b; will-change: transform; transition: transform 600ms ease-out; }
 .score-host svg { display: block; }
 .score-mask-layer { position: absolute; z-index: 1; inset: 0; overflow: hidden; pointer-events: none; }
 .score-mask-layer > svg { display: block; width: 100%; height: 100%; }
 .score-mask-geometry { transform: translateY(var(--score-camera-offset-y, 0px)); transform-origin: 0 0; will-change: transform; transition: transform 600ms ease-out; }
-.performance-mask-layer { position: absolute; z-index: 3; inset: 0; overflow: hidden; clip-path: inset(var(--score-paper-inset-top) 0 0); pointer-events: none; }
+.performance-mask-layer { position: absolute; z-index: 3; inset: 0; overflow: hidden; clip-path: inset(var(--score-toolbar-height) 0 0); pointer-events: none; }
 .performance-mask-layer > svg { display: block; width: 100%; height: 100%; }
 .performance-mask-layer mask > g { transform: translateY(var(--score-camera-offset-y, 0px)); transform-origin: 0 0; will-change: transform; transition: transform 600ms ease-out; }
 .performance-mask-source:is(path, rect, line, polyline, polygon, circle, ellipse, text, use),

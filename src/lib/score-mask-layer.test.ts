@@ -3,6 +3,8 @@ import {
   collectVisibleScoreMaskElements,
   normalizedBlackMix,
   paperOpacityFromTransparency,
+  scoreViewportLayout,
+  viewportRelativeSvgMatrix,
 } from "./score-mask-layer";
 
 interface FakeGraphicsOptions {
@@ -82,5 +84,28 @@ describe("score mask black mixing", () => {
     expect(paperOpacityFromTransparency(0)).toBe(1);
     expect(paperOpacityFromTransparency(0.35)).toBe(0.65);
     expect(paperOpacityFromTransparency(1)).toBe(0);
+  });
+});
+
+describe("score viewport layout", () => {
+  it("reads the shared toolbar and paper inset variables", () => {
+    const values = new Map([
+      ["--score-toolbar-height", "78px"],
+      ["--score-paper-inset-right", "10px"],
+      ["--score-paper-inset-bottom", "12px"],
+      ["--score-paper-inset-left", "14px"],
+    ]);
+    const style = {
+      getPropertyValue: (property: string) => values.get(property) ?? "",
+    } as CSSStyleDeclaration;
+
+    expect(scoreViewportLayout(style)).toEqual({ top: 78, right: 10, bottom: 12, left: 14 });
+  });
+
+  it("keeps nested score geometry relative to the viewport origin", () => {
+    expect(viewportRelativeSvgMatrix(
+      { a: 1, b: 0, c: 0, d: 1, e: 142, f: 286 },
+      { left: 100, top: 200 },
+    )).toBe("matrix(1 0 0 1 42 86)");
   });
 });

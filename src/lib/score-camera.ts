@@ -16,6 +16,13 @@ interface WorkingSystem {
   lastX: number;
 }
 
+export const SCORE_CAMERA_FOCUS_RATIO = 1.7;
+
+interface VerticalCameraOptions {
+  focusRatio?: number;
+  contentTop?: number;
+}
+
 /** Groups note/rest positions into score systems, rather than following every note. */
 function systemsFromAnchors(anchors: VerticalCameraAnchor[]): VerticalCameraSystem[] {
   const columns = new Map<number, VerticalCameraAnchor[]>();
@@ -48,7 +55,7 @@ function systemsFromAnchors(anchors: VerticalCameraAnchor[]): VerticalCameraSyst
     current.lastX = column.x;
   });
 
-  return systems.map(({ startQuarter, top, bottom }) => ({ startQuarter, centerY: (top + bottom) / 1.7 }));
+  return systems.map(({ startQuarter, top, bottom }) => ({ startQuarter, centerY: (top + bottom) / 2 }));
 }
 
 export function verticalCameraOffset(
@@ -56,13 +63,18 @@ export function verticalCameraOffset(
   scoreQuarter: number,
   viewportHeight: number,
   scoreHeight: number,
+  options: VerticalCameraOptions = {},
 ): number {
   if (anchors.length === 0 || viewportHeight <= 0 || scoreHeight <= viewportHeight) return 0;
+  const focusRatio = options.focusRatio && options.focusRatio > 0
+    ? options.focusRatio
+    : SCORE_CAMERA_FOCUS_RATIO;
+  const contentTop = Math.max(0, options.contentTop ?? 0);
   const systems = systemsFromAnchors(anchors);
   const current = systems.reduce<VerticalCameraSystem>((selected, system) =>
     system.startQuarter <= scoreQuarter ? system : selected,
   systems[0]!);
-  const desiredOffset = current.centerY - viewportHeight / 2;
+  const desiredOffset = contentTop + current.centerY - viewportHeight / focusRatio;
   const maximumOffset = Math.max(0, scoreHeight - viewportHeight);
   return Math.max(0, Math.min(desiredOffset, maximumOffset));
 }
@@ -74,10 +86,12 @@ export class ScoreCamera {
 
   constructor(
     private readonly viewport: HTMLElement,
+    private readonly contentClip: HTMLElement,
     private readonly scoreHost: HTMLElement,
   ) {
     this.observer = new ResizeObserver(() => this.update(this.scoreQuarter));
     this.observer.observe(viewport);
+    this.observer.observe(contentClip);
     this.observer.observe(scoreHost);
   }
 
@@ -91,8 +105,9 @@ export class ScoreCamera {
     const offset = verticalCameraOffset(
       this.anchors,
       scoreQuarter,
-      this.viewport.clientHeight,
-      this.scoreHost.scrollHeight,
+      this.contentClip.clientHeight,
+      this.contentClip.scrollHeight,
+      { contentTop: this.scoreHost.offsetTop },
     );
     this.viewport.style.setProperty("--score-camera-offset-y", `${-offset}px`);
     this.scoreHost.style.transform = "translateY(var(--score-camera-offset-y))";

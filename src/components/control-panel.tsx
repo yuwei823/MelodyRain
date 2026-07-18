@@ -5,6 +5,7 @@ import {
   type PerformanceEffectMode,
 } from "../lib/performance-effect-layer";
 import type { LoadedProject } from "../hooks/use-project-loader";
+import type { TitleColorMode } from "../lib/title-color";
 
 export type BackgroundMode = "image" | "color";
 
@@ -24,6 +25,10 @@ interface ControlPanelProps {
   onSaveParameters(): void;
   customTitle: string;
   onCustomTitleChange(value: string): void;
+  titleColor: string;
+  titleColorMode: TitleColorMode;
+  onTitleColorChange(value: string): void;
+  onUseAutoTitleColor(): void;
   measuresPerSystem: number;
   onMeasuresPerSystemChange(value: number): void;
   backgroundMode: BackgroundMode;
@@ -60,6 +65,10 @@ export function ControlPanel({
   onSaveParameters,
   customTitle,
   onCustomTitleChange,
+  titleColor,
+  titleColorMode,
+  onTitleColorChange,
+  onUseAutoTitleColor,
   measuresPerSystem,
   onMeasuresPerSystemChange,
   backgroundMode,
@@ -121,7 +130,7 @@ export function ControlPanel({
         </small>
       </div>
 
-      <label className="title-control">
+      <div className="title-control">
         <span className="step-label">TITLE</span>
         <strong>画面标题</strong>
         <input
@@ -131,8 +140,25 @@ export function ControlPanel({
           onChange={(event) => onCustomTitleChange(event.target.value)}
           aria-label="画面标题"
         />
+        <div className="title-color-control">
+          <span>标题颜色</span>
+          <input
+            type="color"
+            value={titleColor}
+            onChange={(event) => onTitleColorChange(event.target.value)}
+            aria-label="标题颜色"
+          />
+          <output>{titleColor.toUpperCase()}</output>
+          <button
+            type="button"
+            aria-pressed={titleColorMode === "auto"}
+            onClick={onUseAutoTitleColor}
+          >
+            自动
+          </button>
+        </div>
         <small>留空时使用素材原名称。</small>
-      </label>
+      </div>
 
       <div className="layout-control">
         <div className="layout-control-heading">

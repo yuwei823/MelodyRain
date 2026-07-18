@@ -3,11 +3,13 @@ import { PORTRAIT_ASPECT_RATIO, PORTRAIT_RENDER_PROFILE } from "../lib/render-pr
 
 interface StagePanelProps {
   title: string;
+  titleColor: string;
   scoreViewportRef: RefObject<HTMLDivElement | null>;
+  scoreContentClipRef: RefObject<HTMLDivElement | null>;
   scoreHostRef: RefObject<HTMLDivElement | null>;
 }
 
-export function StagePanel({ title, scoreViewportRef, scoreHostRef }: StagePanelProps) {
+export function StagePanel({ title, titleColor, scoreViewportRef, scoreContentClipRef, scoreHostRef }: StagePanelProps) {
   return (
     <section className="stage-panel">
       <div className="stage-preview-wrap">
@@ -18,10 +20,10 @@ export function StagePanel({ title, scoreViewportRef, scoreHostRef }: StagePanel
           aria-label="1080 × 1920 竖屏视频预览"
         >
           <div className="stage-toolbar">
-            <div><h2>{title}</h2></div>
+            <div><h2 style={{ color: titleColor }}>{title}</h2></div>
           </div>
           <div ref={scoreViewportRef} className="score-viewport">
-            <div className="score-content-clip">
+            <div ref={scoreContentClipRef} className="score-content-clip">
               <div ref={scoreHostRef} className="score-host" aria-label="SVG 五线谱预览" />
             </div>
           </div>

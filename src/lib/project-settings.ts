@@ -1,11 +1,14 @@
 import type { BackgroundMode } from "../components/control-panel";
 import type { PerformanceEffectMode } from "./performance-effect-layer";
+import { DARK_TITLE_COLOR, type TitleColorMode } from "./title-color";
 
 export const PROJECT_SETTINGS_FILE_NAME = "melody-rain.settings.json";
 
 export interface ProjectSettings {
   version: 1;
   title: string;
+  titleColor: string;
+  titleColorMode: TitleColorMode;
   measuresPerSystem: number;
   backgroundMode: BackgroundMode;
   backgroundColor: string;
@@ -52,6 +55,9 @@ export function parseProjectSettings(text: string): ProjectSettings {
   if (value.performanceEffectMode !== "mask" && value.performanceEffectMode !== "rainbow") {
     throw new Error("performanceEffectMode 无效");
   }
+  if (value.titleColorMode !== undefined && value.titleColorMode !== "auto" && value.titleColorMode !== "custom") {
+    throw new Error("titleColorMode 无效");
+  }
   const measuresPerSystem = percent(value.measuresPerSystem, "measuresPerSystem");
   if (measuresPerSystem < 1 || measuresPerSystem > 6) throw new Error("measuresPerSystem 必须在 1 到 6 之间");
   if (value.backgroundImageFile !== null && typeof value.backgroundImageFile !== "string") {
@@ -60,6 +66,8 @@ export function parseProjectSettings(text: string): ProjectSettings {
   return {
     version: 1,
     title: value.title,
+    titleColor: value.titleColor === undefined ? DARK_TITLE_COLOR : color(value.titleColor, "titleColor"),
+    titleColorMode: value.titleColorMode === "custom" ? "custom" : "auto",
     measuresPerSystem,
     backgroundMode: value.backgroundMode,
     backgroundColor: color(value.backgroundColor, "backgroundColor"),

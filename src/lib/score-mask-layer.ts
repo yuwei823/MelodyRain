@@ -27,6 +27,38 @@ function cssPixelValue(style: CSSStyleDeclaration, property: string, fallback: n
   return Number.isFinite(value) ? Math.max(0, value) : fallback;
 }
 
+export interface ScoreViewportLayout {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
+export function scoreViewportLayout(style: CSSStyleDeclaration): ScoreViewportLayout {
+  return {
+    top: cssPixelValue(style, "--score-toolbar-height", 78),
+    right: cssPixelValue(style, "--score-paper-inset-right", 10),
+    bottom: cssPixelValue(style, "--score-paper-inset-bottom", 10),
+    left: cssPixelValue(style, "--score-paper-inset-left", 10),
+  };
+}
+
+interface SvgMatrixLike {
+  a: number;
+  b: number;
+  c: number;
+  d: number;
+  e: number;
+  f: number;
+}
+
+export function viewportRelativeSvgMatrix(
+  matrix: SvgMatrixLike,
+  viewportBounds: Pick<DOMRect, "left" | "top">,
+): string {
+  return `matrix(${matrix.a} ${matrix.b} ${matrix.c} ${matrix.d} ${matrix.e - viewportBounds.left} ${matrix.f - viewportBounds.top})`;
+}
+
 export function normalizedBlackMix(value: number): number {
   return clampUnit(value);
 }
@@ -192,13 +224,7 @@ export class ScoreMaskLayer {
   private resize(): void {
     const width = Math.max(1, this.viewport.clientWidth);
     const height = Math.max(1, this.viewport.clientHeight);
-    const viewportStyle = getComputedStyle(this.viewport);
-    const paperInset = {
-      top: cssPixelValue(viewportStyle, "--score-paper-inset-top", 72),
-      right: cssPixelValue(viewportStyle, "--score-paper-inset-right", 10),
-      bottom: cssPixelValue(viewportStyle, "--score-paper-inset-bottom", 10),
-      left: cssPixelValue(viewportStyle, "--score-paper-inset-left", 10),
-    };
+    const paperInset = scoreViewportLayout(getComputedStyle(this.viewport));
     this.svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
     this.mask.setAttribute("x", "0");
     this.mask.setAttribute("y", "0");
@@ -230,10 +256,8 @@ export class ScoreMaskLayer {
   }
 
   private renderGeometry(): void {
-    // Use the shared viewport as the coordinate origin. Deriving it from
-    // scoreHost.offsetTop only works while the host is a direct child; the
-    // fixed clipping wrapper and its internal top spacing introduce another
-    // offset layer that would otherwise shift the static mask by 78px.
+    // The viewport remains the common origin even when clipping and content
+    // spacing add intermediate layout containers around the score host.
     const viewportBounds = this.viewport.getBoundingClientRect();
     const hostLeft = viewportBounds.left;
     const hostTop = viewportBounds.top;
@@ -246,10 +270,7 @@ export class ScoreMaskLayer {
       clone.removeAttribute("class");
       clone.removeAttribute("transform");
       clone.removeAttribute("style");
-      clone.setAttribute(
-        "transform",
-        `matrix(${matrix.a} ${matrix.b} ${matrix.c} ${matrix.d} ${matrix.e - hostLeft} ${matrix.f - hostTop})`,
-      );
+      clone.setAttribute("transform", viewportRelativeSvgMatrix(matrix, { left: hostLeft, top: hostTop }));
       clone.setAttribute("fill", source.fill ? "white" : "none");
       clone.setAttribute("stroke", source.stroke ? "white" : "none");
       clone.setAttribute("opacity", "1");

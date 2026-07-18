@@ -6,6 +6,7 @@ import {
   type StemDirection,
 } from "./performance-effect-layer";
 import { collectVisibleScoreMaskElements } from "./score-mask-layer";
+import { sanitizeScoreMusicXml } from "./score-sanitizer";
 
 export interface ScoreTarget {
   id: string;
@@ -84,7 +85,7 @@ export class ScoreRenderer {
 
   async render(musicXml: string, measuresPerSystem = 4, _requestedScoreScale?: number): Promise<ScoreRenderResult> {
     const osmd = await this.ensureOsmd();
-    const laidOutXml = applyMeasuresPerSystem(musicXml, measuresPerSystem);
+    const laidOutXml = applyMeasuresPerSystem(sanitizeScoreMusicXml(musicXml), measuresPerSystem);
     osmd.clear();
     await osmd.load(laidOutXml);
     const availableWidth = Math.max(320, this.container.clientWidth);

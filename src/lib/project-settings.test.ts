@@ -10,6 +10,8 @@ import {
 const SETTINGS: ProjectSettings = {
   version: 1,
   title: "Cruel Summer",
+  titleColor: "#25364A",
+  titleColorMode: "auto",
   measuresPerSystem: 2,
   backgroundMode: "image",
   backgroundColor: "#000000",
@@ -50,5 +52,13 @@ describe("project settings", () => {
     expect(parsed.maskBlackMixPercent).toBe(100);
     expect(parsed.paperTransparencyPercent).toBe(0);
     expect(parsed.performanceMixPercent).toBe(43);
+  });
+
+  it("keeps older version-1 files compatible by defaulting title color to auto", () => {
+    const { titleColor: _titleColor, titleColorMode: _titleColorMode, ...legacy } = SETTINGS;
+    const parsed = parseProjectSettings(JSON.stringify(legacy));
+
+    expect(parsed.titleColor).toBe("#25364A");
+    expect(parsed.titleColorMode).toBe("auto");
   });
 });

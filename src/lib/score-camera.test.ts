@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { verticalCameraOffset } from "./score-camera";
+import { SCORE_CAMERA_FOCUS_RATIO, verticalCameraOffset } from "./score-camera";
 
 const anchors = [
   { scoreQuarter: 0, x: 100, y: 120 },
@@ -12,12 +12,17 @@ const anchors = [
 ];
 
 describe("vertical score camera", () => {
-  it("does not move before the active position reaches the viewport midpoint", () => {
+  it("does not move before the active position reaches the configured focal line", () => {
     expect(verticalCameraOffset(anchors, 0, 600, 1_500)).toBe(0);
   });
 
   it("keeps the active system at the configured vertical focal line while score remains below", () => {
-    expect(verticalCameraOffset(anchors, 8, 600, 1_500)).toBeCloseTo(711.7647);
+    expect(verticalCameraOffset(anchors, 8, 600, 1_500)).toBeCloseTo(860 - 600 / SCORE_CAMERA_FOCUS_RATIO);
+  });
+
+  it("accounts for content spacing inside the clipped viewport", () => {
+    expect(verticalCameraOffset(anchors, 8, 600, 1_500, { contentTop: 32 }))
+      .toBeCloseTo(32 + 860 - 600 / SCORE_CAMERA_FOCUS_RATIO);
   });
 
   it("does not move for each note within the same system", () => {
@@ -25,6 +30,6 @@ describe("vertical score camera", () => {
   });
 
   it("clamps at the score end so later notes naturally move toward the bottom", () => {
-    expect(verticalCameraOffset(anchors, 12, 600, 1_500)).toBe(900);
+    expect(verticalCameraOffset(anchors, 12, 600, 1_500, { focusRatio: 10 })).toBe(900);
   });
 });

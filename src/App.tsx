@@ -18,6 +18,13 @@ import { ScoreRenderer } from "./lib/score-renderer";
 import { ScoreTimelineLayer } from "./lib/score-timeline-layer";
 import { MediaTransport, TRANSPORT_PRE_ROLL_MS, type TransportSnapshot } from "./lib/transport";
 import type { ProjectSettings } from "./lib/project-settings";
+import {
+  DARK_TITLE_COLOR,
+  LIGHT_TITLE_COLOR,
+  readableTitleColorForImage,
+  readableTitleColorForSolid,
+  type TitleColorMode,
+} from "./lib/title-color";
 
 const EMPTY_SNAPSHOT: TransportSnapshot = {
   state: "idle",
@@ -41,6 +48,8 @@ export default function App() {
   const [snapshot, setSnapshot] = useState(EMPTY_SNAPSHOT);
   const [targetCount, setTargetCount] = useState(0);
   const [customTitle, setCustomTitle] = useState("");
+  const [titleColor, setTitleColor] = useState(DARK_TITLE_COLOR);
+  const [titleColorMode, setTitleColorMode] = useState<TitleColorMode>("auto");
   const [measuresPerSystem, setMeasuresPerSystem] = useState(PORTRAIT_RENDER_PROFILE.measuresPerSystem);
   const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>("color");
   const [backgroundColor, setBackgroundColor] = useState("#000000");
@@ -53,6 +62,7 @@ export default function App() {
   const [backgroundImageUrl, setBackgroundImageUrl] = useState<string | null>(null);
   const scoreHostRef = useRef<HTMLDivElement>(null);
   const scoreViewportRef = useRef<HTMLDivElement>(null);
+  const scoreContentClipRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const transportRef = useRef<MediaTransport | null>(null);
   const rainLayerRef = useRef<RainLayer | null>(null);
@@ -64,6 +74,8 @@ export default function App() {
 
   const applyProjectSettings = useCallback((settings: ProjectSettings) => {
     setCustomTitle(settings.title);
+    setTitleColor(settings.titleColor);
+    setTitleColorMode(settings.titleColorMode);
     setMeasuresPerSystem(settings.measuresPerSystem);
     setBackgroundColor(settings.backgroundColor);
     setMaskBlackMixPercent(settings.maskBlackMixPercent);
@@ -83,6 +95,7 @@ export default function App() {
     if (nextProject.settings) applyProjectSettings(nextProject.settings);
     else {
       setCustomTitle("");
+      setTitleColorMode("auto");
       setSelectedBackgroundIndex(0);
       setBackgroundMode(nextProject.backgrounds.length > 0 ? "image" : "color");
     }
@@ -115,6 +128,8 @@ export default function App() {
   const currentProjectSettings = useMemo<ProjectSettings>(() => ({
     version: 1,
     title: customTitle,
+    titleColor,
+    titleColorMode,
     measuresPerSystem,
     backgroundMode,
     backgroundColor,
@@ -135,6 +150,8 @@ export default function App() {
     performanceMixColor,
     performanceMixPercent,
     selectedBackgroundFile,
+    titleColor,
+    titleColorMode,
   ]);
   useEffect(() => {
     if (!selectedBackgroundFile) {
@@ -153,6 +170,22 @@ export default function App() {
   ), [backgroundColor, backgroundImageUrl, backgroundMode]);
   const maskSourceRef = useRef<ScoreMaskSource>(maskSource);
   maskSourceRef.current = maskSource;
+  useEffect(() => {
+    if (titleColorMode !== "auto") return;
+    let cancelled = false;
+    if (maskSource.kind === "color") {
+      setTitleColor(readableTitleColorForSolid(maskSource.color));
+      return;
+    }
+    void readableTitleColorForImage(maskSource.url)
+      .then((color) => {
+        if (!cancelled) setTitleColor(color);
+      })
+      .catch(() => {
+        if (!cancelled) setTitleColor(LIGHT_TITLE_COLOR);
+      });
+    return () => { cancelled = true; };
+  }, [maskSource, titleColorMode]);
   const maskBlackMixPercentRef = useRef(maskBlackMixPercent);
   maskBlackMixPercentRef.current = maskBlackMixPercent;
   const paperTransparencyPercentRef = useRef(paperTransparencyPercent);
@@ -167,7 +200,8 @@ export default function App() {
 
   useEffect(() => {
     const host = scoreHostRef.current;
-    if (!host || !project) return;
+    const contentClip = scoreContentClipRef.current;
+    if (!host || !contentClip || !project) return;
     let cancelled = false;
     const disposeLayers = () => {
       const layers = [
@@ -222,7 +256,7 @@ export default function App() {
           scoreMaskLayer.setBlackMix(maskBlackMixPercentRef.current / 100);
           scoreMaskLayer.setPaperTransparency(paperTransparencyPercentRef.current / 100);
           scoreMaskLayerRef.current = scoreMaskLayer;
-          const scoreCamera = new ScoreCamera(viewport, host);
+          const scoreCamera = new ScoreCamera(viewport, contentClip, host);
           scoreCamera.setAnchors([
             ...targets.map((target) => ({ scoreQuarter: target.scoreQuarter, x: target.x, y: target.y })),
             ...restSymbols.map((rest) => ({ scoreQuarter: rest.scoreQuarter, x: rest.x, y: rest.y })),
@@ -352,6 +386,13 @@ export default function App() {
           onSaveParameters={() => void saveProjectSettings(currentProjectSettings)}
           customTitle={customTitle}
           onCustomTitleChange={setCustomTitle}
+          titleColor={titleColor}
+          titleColorMode={titleColorMode}
+          onTitleColorChange={(color) => {
+            setTitleColor(color.toUpperCase());
+            setTitleColorMode("custom");
+          }}
+          onUseAutoTitleColor={() => setTitleColorMode("auto")}
           measuresPerSystem={measuresPerSystem}
           onMeasuresPerSystemChange={setMeasuresPerSystem}
           backgroundMode={backgroundMode}
@@ -385,7 +426,9 @@ export default function App() {
         />
         <StagePanel
           title={customTitle.trim() || project?.label || "等待素材"}
+          titleColor={titleColor}
           scoreViewportRef={scoreViewportRef}
+          scoreContentClipRef={scoreContentClipRef}
           scoreHostRef={scoreHostRef}
         />
       </section>
