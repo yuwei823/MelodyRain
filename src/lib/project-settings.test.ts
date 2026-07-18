@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   PROJECT_SETTINGS_FILE_NAME,
+  PROJECT_SETTINGS_VERSION,
   findProjectSettingsFile,
   parseProjectSettings,
   serializeProjectSettings,
@@ -8,7 +9,7 @@ import {
 } from "./project-settings";
 
 const SETTINGS: ProjectSettings = {
-  version: 1,
+  version: PROJECT_SETTINGS_VERSION,
   title: "Cruel Summer",
   titleColor: "#25364A",
   titleColorMode: "auto",
@@ -37,7 +38,7 @@ describe("project settings", () => {
   });
 
   it("rejects unsupported versions and invalid colors", () => {
-    expect(() => parseProjectSettings(JSON.stringify({ ...SETTINGS, version: 2 }))).toThrow("版本");
+    expect(() => parseProjectSettings(JSON.stringify({ ...SETTINGS, version: 3 }))).toThrow("版本");
     expect(() => parseProjectSettings(JSON.stringify({ ...SETTINGS, performanceMixColor: "purple" })))
       .toThrow("颜色");
   });
@@ -54,11 +55,28 @@ describe("project settings", () => {
     expect(parsed.performanceMixPercent).toBe(43);
   });
 
-  it("keeps older version-1 files compatible by defaulting title color to auto", () => {
+  it("migrates version-1 files and defaults the fields introduced in version 2", () => {
     const { titleColor: _titleColor, titleColorMode: _titleColorMode, ...legacy } = SETTINGS;
-    const parsed = parseProjectSettings(JSON.stringify(legacy));
+    const parsed = parseProjectSettings(JSON.stringify({ ...legacy, version: 1 }));
 
+    expect(parsed.version).toBe(PROJECT_SETTINGS_VERSION);
     expect(parsed.titleColor).toBe("#25364A");
     expect(parsed.titleColorMode).toBe("auto");
+  });
+
+  it("preserves newer fields already present in a version-1 file", () => {
+    const parsed = parseProjectSettings(JSON.stringify({
+      ...SETTINGS,
+      version: 1,
+      titleColor: "#123456",
+      titleColorMode: "custom",
+    }));
+
+    expect(parsed).toMatchObject({ version: 2, titleColor: "#123456", titleColorMode: "custom" });
+  });
+
+  it("rejects files without a valid version instead of guessing their schema", () => {
+    const { version: _version, ...unversioned } = SETTINGS;
+    expect(() => parseProjectSettings(JSON.stringify(unversioned))).toThrow("版本");
   });
 });

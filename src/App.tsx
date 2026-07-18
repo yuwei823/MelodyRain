@@ -17,7 +17,7 @@ import { ScoreMaskLayer, type ScoreMaskSource } from "./lib/score-mask-layer";
 import { ScoreRenderer } from "./lib/score-renderer";
 import { ScoreTimelineLayer } from "./lib/score-timeline-layer";
 import { MediaTransport, TRANSPORT_PRE_ROLL_MS, type TransportSnapshot } from "./lib/transport";
-import type { ProjectSettings } from "./lib/project-settings";
+import { PROJECT_SETTINGS_VERSION, type ProjectSettings } from "./lib/project-settings";
 import {
   DARK_TITLE_COLOR,
   LIGHT_TITLE_COLOR,
@@ -126,7 +126,7 @@ export default function App() {
 
   const selectedBackgroundFile = project?.backgrounds[selectedBackgroundIndex] ?? null;
   const currentProjectSettings = useMemo<ProjectSettings>(() => ({
-    version: 1,
+    version: PROJECT_SETTINGS_VERSION,
     title: customTitle,
     titleColor,
     titleColorMode,
