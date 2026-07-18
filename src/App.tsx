@@ -334,7 +334,7 @@ export default function App() {
               value={measuresPerSystem}
               onChange={(event) => setMeasuresPerSystem(Number(event.target.value))}
             />
-            <p>乐谱按原尺寸的 2/3 显示，竖屏默认每行 3 个小节；首行自然排版，后续各行与首行栏线对齐。</p>
+            <p>乐谱按原尺寸的 2/3 显示，竖屏默认每行 2 个小节；首行自然排版，后续各行与首行栏线对齐。</p>
           </div>
 
           <label className="title-control">

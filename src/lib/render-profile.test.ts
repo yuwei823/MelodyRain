@@ -10,7 +10,7 @@ describe("portrait render profile", () => {
       height: 1920,
       fps: 60,
       scoreScale: 2 / 3,
-      measuresPerSystem: 3,
+      measuresPerSystem: 2,
     });
     expect(PORTRAIT_RENDER_PROFILE.width / PORTRAIT_RENDER_PROFILE.height).toBe(9 / 16);
     expect(PORTRAIT_ASPECT_RATIO).toBe("1080 / 1920");

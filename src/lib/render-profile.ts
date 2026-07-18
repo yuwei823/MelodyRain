@@ -15,7 +15,7 @@ export const PORTRAIT_RENDER_PROFILE: Readonly<RenderProfile> = Object.freeze({
   height: 1920,
   fps: 60,
   scoreScale: 2 / 3,
-  measuresPerSystem: 3,
+  measuresPerSystem: 2,
 });
 
 export const PORTRAIT_ASPECT_RATIO = `${PORTRAIT_RENDER_PROFILE.width} / ${PORTRAIT_RENDER_PROFILE.height}`;

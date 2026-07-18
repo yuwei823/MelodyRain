@@ -263,7 +263,10 @@ export class ScoreRenderer {
         return overlapsX && touchesY;
       });
 
-      if (connected.length < 2) continue;
+      // A short secondary beam can belong to one sixteenth-note stem only.
+      // It is still part of that note's visual body and must not remain on
+      // the stationary score after the notehead has begun falling.
+      if (connected.length === 0) continue;
       beam.style.setProperty("visibility", "hidden");
       connected.forEach((target) => target.notation?.beamElements.push(beam));
     }
