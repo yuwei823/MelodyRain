@@ -104,8 +104,8 @@ button { color: inherit; }
 .stage-toolbar h2 { color: #25364a; text-align: center; }
 .transport-stats { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
 .transport-stats span { padding: 7px 10px; border-radius: 8px; background: rgba(123, 166, 203, .08); color: #9fb3c8; font-size: 11px; font-variant-numeric: tabular-nums; }
-.score-viewport { position: relative; min-height: 0; flex: 1; overflow: hidden; isolation: isolate; background: #eef1f5; scrollbar-color: #5d7188 transparent; }
-.score-host { position: relative; z-index: 2; min-height: 100%; color: #10151b; will-change: transform; transition: transform 900ms ease-out; }
+.score-viewport { position: relative; min-height: 0; flex: 1; overflow: hidden; isolation: isolate; background: #eef1f5; scrollbar-color: #5d7188 transparent; --score-paper-inset-top: 72px; --score-paper-inset-right: 10px; --score-paper-inset-bottom: 10px; --score-paper-inset-left: 10px; }
+.score-host { position: relative; z-index: 2; min-height: calc(100% - var(--score-paper-inset-top) - var(--score-paper-inset-bottom)); margin: var(--score-paper-inset-top) var(--score-paper-inset-right) var(--score-paper-inset-bottom) var(--score-paper-inset-left); color: #10151b; will-change: transform; transition: transform 900ms ease-out; }
 .score-host svg { display: block; }
 .score-mask-layer { position: absolute; z-index: 1; inset: 0; overflow: hidden; pointer-events: none; }
 .score-mask-layer > svg { display: block; width: 100%; height: 100%; }
@@ -184,5 +184,4 @@ button { color: inherit; }
   .transport-stats { justify-content: flex-start; }
   .stage-preview-wrap { padding: 10px; }
   .portrait-frame { border-radius: 12px; }
-  .score-viewport { padding: 10px; }
 }

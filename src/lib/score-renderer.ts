@@ -257,7 +257,10 @@ export class ScoreRenderer {
         stemElement = stemGroup;
         if (stemGroup && !noteElement.contains(stemGroup)) attachedElements.push(stemGroup);
       }
-      return { noteElement, attachedElements, stemElement, beamElements: [] };
+      const outermostAttachedElements = [...new Set(attachedElements)].filter((element, _index, elements) => (
+        !elements.some((candidate) => candidate !== element && candidate.contains(element))
+      ));
+      return { noteElement, attachedElements: outermostAttachedElements, stemElement, beamElements: [] };
     } catch {
       return undefined;
     }

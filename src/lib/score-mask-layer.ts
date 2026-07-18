@@ -16,6 +16,11 @@ const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 const GRAPHICS_SELECTOR = "path,rect,line,polyline,polygon,circle,ellipse,text,use";
 let nextMaskId = 0;
 
+function cssPixelValue(style: CSSStyleDeclaration, property: string, fallback: number): number {
+  const value = Number.parseFloat(style.getPropertyValue(property));
+  return Number.isFinite(value) ? Math.max(0, value) : fallback;
+}
+
 export function normalizedBlackMix(value: number): number {
   return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
 }
@@ -80,10 +85,14 @@ function svgElement<K extends keyof SVGElementTagNameMap>(name: K): SVGElementTa
 
 export class ScoreMaskLayer {
   private readonly maskId = `score-static-mask-${nextMaskId++}`;
+  private readonly paperClipId = `${this.maskId}-paper-clip`;
   private readonly overlay = document.createElement("div");
   private readonly svg = svgElement("svg");
   private readonly mask = svgElement("mask");
   private readonly geometry = svgElement("g");
+  private readonly paperClip = svgElement("clipPath");
+  private readonly paperClipRect = svgElement("rect");
+  private readonly foreground = svgElement("g");
   private readonly backgroundColorRect = svgElement("rect");
   private readonly backgroundImage = svgElement("image");
   private readonly paperRect = svgElement("rect");
@@ -108,7 +117,10 @@ export class ScoreMaskLayer {
     this.mask.append(this.geometry);
 
     const defs = svgElement("defs");
-    defs.append(this.mask);
+    this.paperClip.id = this.paperClipId;
+    this.paperClipRect.classList.add("score-paper-clip");
+    this.paperClip.append(this.paperClipRect);
+    defs.append(this.mask, this.paperClip);
     this.backgroundImage.setAttribute("preserveAspectRatio", "xMidYMid slice");
     this.paperRect.setAttribute("fill", "#eef1f5");
     this.paperRect.setAttribute("opacity", "1");
@@ -118,14 +130,13 @@ export class ScoreMaskLayer {
     this.blackMixRect.setAttribute("fill", "black");
     this.blackMixRect.setAttribute("mask", `url(#${this.maskId})`);
     this.blackMixRect.setAttribute("opacity", "0");
+    this.foreground.setAttribute("clip-path", `url(#${this.paperClipId})`);
+    this.foreground.append(this.paperRect, this.colorRect, this.image, this.blackMixRect);
     this.svg.append(
       defs,
       this.backgroundColorRect,
       this.backgroundImage,
-      this.paperRect,
-      this.colorRect,
-      this.image,
-      this.blackMixRect,
+      this.foreground,
     );
     this.overlay.append(this.svg);
     this.viewport.append(this.overlay);
@@ -189,6 +200,13 @@ export class ScoreMaskLayer {
   private resize(): void {
     const width = Math.max(1, this.viewport.clientWidth);
     const height = Math.max(1, this.viewport.clientHeight);
+    const viewportStyle = getComputedStyle(this.viewport);
+    const paperInset = {
+      top: cssPixelValue(viewportStyle, "--score-paper-inset-top", 72),
+      right: cssPixelValue(viewportStyle, "--score-paper-inset-right", 10),
+      bottom: cssPixelValue(viewportStyle, "--score-paper-inset-bottom", 10),
+      left: cssPixelValue(viewportStyle, "--score-paper-inset-left", 10),
+    };
     this.svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
     this.mask.setAttribute("x", "0");
     this.mask.setAttribute("y", "0");
@@ -207,6 +225,16 @@ export class ScoreMaskLayer {
       element.setAttribute("width", String(width));
       element.setAttribute("height", String(height));
     });
+    this.paperClipRect.setAttribute("x", String(paperInset.left));
+    this.paperClipRect.setAttribute("y", String(paperInset.top));
+    this.paperClipRect.setAttribute(
+      "width",
+      String(Math.max(0, width - paperInset.left - paperInset.right)),
+    );
+    this.paperClipRect.setAttribute(
+      "height",
+      String(Math.max(0, height - paperInset.top - paperInset.bottom)),
+    );
   }
 
   private renderGeometry(): void {
