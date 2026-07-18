@@ -40,7 +40,7 @@ button { color: inherit; }
 .control-panel, .playback-panel { position: sticky; top: 18px; border-radius: 20px; padding: 22px; }
 .control-panel { grid-area: controls; }
 .playback-panel { grid-area: playback; min-width: 0; }
-.stage-toolbar h2 { margin: 0; font-size: 19px; }
+.stage-toolbar h2 { margin: 0; font-size: 26px; }
 .layout-control, .background-control, .performance-effect-control { margin-top: 20px; padding: 15px; border: 1px solid var(--line); border-radius: 12px; background: rgba(5, 14, 26, .25); }
 .layout-control-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .layout-control-heading .step-label { margin-bottom: 4px; }
