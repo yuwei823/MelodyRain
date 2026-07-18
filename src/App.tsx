@@ -54,6 +54,8 @@ const EMPTY_SNAPSHOT: TransportSnapshot = {
   activeNoteIds: [],
 };
 
+const PLAYING_UI_REFRESH_INTERVAL_MS = 50;
+
 async function readScoreFile(file: File): Promise<string> {
   return file.name.toLowerCase().endsWith(".mxl") ? extractMusicXml(await file.arrayBuffer()) : file.text();
 }
@@ -94,12 +96,10 @@ export default function App() {
   const scoreMaskLayerRef = useRef<ScoreMaskLayer | null>(null);
   const performanceEffectLayerRef = useRef<PerformanceEffectLayer | null>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
+  const loadRequestRef = useRef(0);
 
   const adoptProject = useCallback((nextProject: LoadedProject) => {
-    setProject((previous) => {
-      if (previous?.revokeAudioUrl) URL.revokeObjectURL(previous.audioUrl);
-      return nextProject;
-    });
+    setProject(nextProject);
     setCustomTitle("");
     setSelectedBackgroundIndex(0);
     setBackgroundMode(nextProject.backgrounds.length > 0 ? "image" : "color");
@@ -141,20 +141,28 @@ export default function App() {
     const host = scoreHostRef.current;
     if (!host || !project) return;
     let cancelled = false;
-    rainLayerRef.current?.dispose();
-    rainLayerRef.current = null;
-    scoreTimelineLayerRef.current?.dispose();
-    scoreTimelineLayerRef.current = null;
-    scoreCameraRef.current?.dispose();
-    scoreCameraRef.current = null;
-    scoreMaskLayerRef.current?.dispose();
-    scoreMaskLayerRef.current = null;
-    performanceEffectLayerRef.current?.dispose();
-    performanceEffectLayerRef.current = null;
-    host.replaceChildren();
+    const disposeLayers = () => {
+      const layers = [
+        rainLayerRef.current,
+        scoreTimelineLayerRef.current,
+        scoreCameraRef.current,
+        scoreMaskLayerRef.current,
+        performanceEffectLayerRef.current,
+      ];
+      layers.forEach((layer) => layer?.dispose());
+      rainLayerRef.current = null;
+      scoreTimelineLayerRef.current = null;
+      scoreCameraRef.current = null;
+      scoreMaskLayerRef.current = null;
+      performanceEffectLayerRef.current = null;
+    };
+    disposeLayers();
+    const renderHost = document.createElement("div");
+    renderHost.className = "score-render-content";
+    host.replaceChildren(renderHost);
     setTargetCount(0);
     setStatus("正在排版 SVG 五线谱…");
-    const renderer = new ScoreRenderer(host);
+    const renderer = new ScoreRenderer(renderHost);
     void renderer
       .render(project.musicXml, measuresPerSystem, PORTRAIT_RENDER_PROFILE.scoreScale)
       .then(({ targets, restSymbols, revealElements, growingSpans, maskElements }) => {
@@ -204,16 +212,8 @@ export default function App() {
       });
     return () => {
       cancelled = true;
-      rainLayerRef.current?.dispose();
-      rainLayerRef.current = null;
-      scoreTimelineLayerRef.current?.dispose();
-      scoreTimelineLayerRef.current = null;
-      scoreCameraRef.current?.dispose();
-      scoreCameraRef.current = null;
-      scoreMaskLayerRef.current?.dispose();
-      scoreMaskLayerRef.current = null;
-      performanceEffectLayerRef.current?.dispose();
-      performanceEffectLayerRef.current = null;
+      disposeLayers();
+      renderHost.remove();
     };
   }, [project, measuresPerSystem]);
 
@@ -235,13 +235,6 @@ export default function App() {
   }, [paperTransparencyPercent]);
 
   useEffect(() => {
-    rainLayerRef.current?.update(snapshot.sourceTimeMs);
-    scoreTimelineLayerRef.current?.update(snapshot.sourceTimeMs);
-    scoreCameraRef.current?.update(snapshot.scoreQuarter);
-    performanceEffectLayerRef.current?.update();
-  }, [snapshot.scoreQuarter, snapshot.sourceTimeMs]);
-
-  useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !project) return;
     transportRef.current?.dispose();
@@ -249,7 +242,29 @@ export default function App() {
     audio.load();
     const transport = new MediaTransport(audio, new MidiTimeline(project.midi));
     transportRef.current = transport;
-    const unsubscribe = transport.subscribe(setSnapshot);
+    let lastPublishedAt = Number.NEGATIVE_INFINITY;
+    let lastPublishedState: TransportSnapshot["state"] | null = null;
+    let lastPublishedTempoScale = 0;
+    const unsubscribe = transport.subscribe((nextSnapshot) => {
+      rainLayerRef.current?.update(nextSnapshot.sourceTimeMs);
+      scoreTimelineLayerRef.current?.update(nextSnapshot.sourceTimeMs);
+      scoreCameraRef.current?.update(nextSnapshot.scoreQuarter);
+      performanceEffectLayerRef.current?.update();
+
+      const now = performance.now();
+      const transportControlsChanged = nextSnapshot.state !== lastPublishedState
+        || nextSnapshot.tempoScale !== lastPublishedTempoScale;
+      if (
+        nextSnapshot.state !== "playing"
+        || transportControlsChanged
+        || now - lastPublishedAt >= PLAYING_UI_REFRESH_INTERVAL_MS
+      ) {
+        lastPublishedAt = now;
+        lastPublishedState = nextSnapshot.state;
+        lastPublishedTempoScale = nextSnapshot.tempoScale;
+        setSnapshot(nextSnapshot);
+      }
+    });
     return () => {
       unsubscribe();
       transport.dispose();
@@ -264,11 +279,14 @@ export default function App() {
     [project],
   );
 
-  const activeNotes = useMemo(() => {
-    if (!project) return [];
-    const active = new Set(snapshot.activeNoteIds);
-    return project.midi.events.filter((event) => active.has(event.id));
-  }, [project, snapshot.activeNoteIds]);
+  const midiEventsById = useMemo(
+    () => new Map(project?.midi.events.map((event) => [event.id, event]) ?? []),
+    [project],
+  );
+  const activeNotes = useMemo(() => snapshot.activeNoteIds.flatMap((id) => {
+    const event = midiEventsById.get(id);
+    return event ? [event] : [];
+  }), [midiEventsById, snapshot.activeNoteIds]);
 
   const loadRememberedFolder = async () => {
     try {
@@ -291,6 +309,7 @@ export default function App() {
   }, []);
 
   const selectAssetFolderFromFiles = (files: File[]) => {
+    const requestId = ++loadRequestRef.current;
     setScoreFile(null);
     setMidiFile(null);
     setAudioFile(null);
@@ -306,7 +325,7 @@ export default function App() {
       setAudioFile(matched.audio);
       setBackgroundFiles(matched.backgrounds);
       setError(null);
-      void loadLocalFiles(matched);
+      void loadLocalFiles(matched, requestId);
     } catch (caught) {
       setStatus("素材匹配失败");
       setError(caught instanceof Error ? caught.message : String(caught));
@@ -334,18 +353,12 @@ export default function App() {
     }
   };
 
-  const loadLocalFiles = async (matchedAssets?: MatchedProjectAssets<File>) => {
-    const assets = matchedAssets ?? (scoreFile && midiFile && audioFile
-      ? { score: scoreFile, midi: midiFile, audio: audioFile, backgrounds: backgroundFiles }
-      : null);
-    if (!assets) {
-      setError("请选择包含 MXL/MusicXML、MIDI 和 MP3 的素材文件夹");
-      return;
-    }
+  const loadLocalFiles = async (assets: MatchedProjectAssets<File>, requestId: number) => {
     setStatus("正在解析本地文件…");
     setError(null);
     try {
       const [musicXml, midiBuffer] = await Promise.all([readScoreFile(assets.score), assets.midi.arrayBuffer()]);
+      if (requestId !== loadRequestRef.current) return;
       adoptProject({
         label: assets.score.name,
         musicXml,
@@ -357,6 +370,7 @@ export default function App() {
       });
       setStatus("本地文件已加载");
     } catch (caught) {
+      if (requestId !== loadRequestRef.current) return;
       setStatus("解析失败");
       setError(caught instanceof Error ? caught.message : String(caught));
     }

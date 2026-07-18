@@ -1,4 +1,12 @@
 import type { ScoreMaskSource } from "./score-mask-layer";
+import {
+  SVG_GRAPHICS_SELECTOR,
+  clampUnit,
+  createSvgElement,
+  hasVisiblePaint,
+  numericOpacity,
+  uniqueSvgElements,
+} from "./svg-graphics";
 
 export type PitchStep = "C" | "D" | "E" | "F" | "G" | "A" | "B";
 export type StemDirection = "up" | "down" | "none";
@@ -49,8 +57,6 @@ export const FULL_RAINBOW_STOPS: readonly PerformanceGradientStop[] = (
   Object.entries(PERFORMANCE_RAINBOW_PALETTE) as Array<[PitchStep, string]>
 ).map(([, color], index, entries) => ({ offset: index / (entries.length - 1), color }));
 
-const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
-const GRAPHICS_SELECTOR = "path,rect,line,polyline,polygon,circle,ellipse,text,use";
 let nextPerformanceLayerId = 0;
 let nextGradientId = 0;
 
@@ -72,33 +78,9 @@ interface MaskClone {
   baseBottom: number;
 }
 
-function svgElement<K extends keyof SVGElementTagNameMap>(name: K): SVGElementTagNameMap[K] {
-  return document.createElementNS(SVG_NAMESPACE, name);
-}
-
-function clampedUnit(value: number): number {
-  return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
-}
-
-function numericOpacity(value: string): number {
-  const parsed = Number.parseFloat(value);
-  return Number.isFinite(parsed) ? parsed : 1;
-}
-
-function visiblePaint(value: string, opacity: string): boolean {
-  return value !== "none"
-    && value !== "transparent"
-    && value !== "rgba(0, 0, 0, 0)"
-    && numericOpacity(opacity) > 0;
-}
-
 function paintedLeaves(element: SVGGraphicsElement): SVGGraphicsElement[] {
-  const descendants = [...element.querySelectorAll<SVGGraphicsElement>(GRAPHICS_SELECTOR)];
-  return element.matches(GRAPHICS_SELECTOR) ? [element, ...descendants] : descendants;
-}
-
-function uniqueElements(elements: SVGGraphicsElement[]): SVGGraphicsElement[] {
-  return [...new Set(elements)];
+  const descendants = [...element.querySelectorAll<SVGGraphicsElement>(SVG_GRAPHICS_SELECTOR)];
+  return element.matches(SVG_GRAPHICS_SELECTOR) ? [element, ...descendants] : descendants;
 }
 
 export function pitchStepFromFundamentalNote(value: number): PitchStep {
@@ -128,7 +110,7 @@ export function normalizedGradientStops(
 
 export function mergePerformanceVisuals(...visuals: PerformanceVisuals[]): PerformanceVisuals {
   return {
-    maskElements: uniqueElements(visuals.flatMap((visual) => visual.maskElements)),
+    maskElements: uniqueSvgElements(visuals.flatMap((visual) => visual.maskElements)),
     paints: visuals.flatMap((visual) => visual.paints),
   };
 }
@@ -136,12 +118,12 @@ export function mergePerformanceVisuals(...visuals: PerformanceVisuals[]): Perfo
 export class PerformanceEffectLayer {
   private readonly maskId = `performance-mask-${nextPerformanceLayerId++}`;
   private readonly overlay = document.createElement("div");
-  private readonly svg = svgElement("svg");
-  private readonly mask = svgElement("mask");
-  private readonly maskGeometry = svgElement("g");
-  private readonly colorRect = svgElement("rect");
-  private readonly image = svgElement("image");
-  private readonly tintRect = svgElement("rect");
+  private readonly svg = createSvgElement("svg");
+  private readonly mask = createSvgElement("mask");
+  private readonly maskGeometry = createSvgElement("g");
+  private readonly colorRect = createSvgElement("rect");
+  private readonly image = createSvgElement("image");
+  private readonly tintRect = createSvgElement("rect");
   private readonly observer: ResizeObserver;
   private readonly originals = new Map<SVGGraphicsElement, OriginalPaintStyle>();
   private readonly gradientDefs = new Set<SVGDefsElement>();
@@ -166,7 +148,7 @@ export class PerformanceEffectLayer {
     this.mask.setAttribute("maskContentUnits", "userSpaceOnUse");
     this.mask.setAttribute("mask-type", "alpha");
     this.mask.append(this.maskGeometry);
-    const defs = svgElement("defs");
+    const defs = createSvgElement("defs");
     defs.append(this.mask);
     this.colorRect.setAttribute("mask", `url(#${this.maskId})`);
     this.image.setAttribute("mask", `url(#${this.maskId})`);
@@ -187,7 +169,7 @@ export class PerformanceEffectLayer {
   setVisuals(visuals: PerformanceVisuals): void {
     this.clearMaskSources();
     this.clearRainbowPaints();
-    this.maskSources = uniqueElements(visuals.maskElements);
+    this.maskSources = uniqueSvgElements(visuals.maskElements);
     this.paints = visuals.paints;
     this.rebuildMaskClones();
     this.applyMode();
@@ -203,7 +185,7 @@ export class PerformanceEffectLayer {
 
   setConfig(config: PerformanceEffectConfig): void {
     const changedMode = config.mode !== this.config.mode;
-    this.config = { ...config, mixAmount: clampedUnit(config.mixAmount) };
+    this.config = { ...config, mixAmount: clampUnit(config.mixAmount) };
     this.tintRect.setAttribute("fill", this.config.mixColor);
     this.tintRect.setAttribute("opacity", String(this.config.mixAmount));
     if (changedMode) this.applyMode();
@@ -276,8 +258,8 @@ export class PerformanceEffectLayer {
       this.rememberPaint(leaf);
       const style = getComputedStyle(leaf);
       leaf.style.setProperty("color", paint.kind === "solid" ? paint.color : PERFORMANCE_RAINBOW_PALETTE.G, "important");
-      if (visiblePaint(style.fill, style.fillOpacity)) leaf.style.setProperty("fill", value, "important");
-      if (visiblePaint(style.stroke, style.strokeOpacity)) leaf.style.setProperty("stroke", value, "important");
+      if (hasVisiblePaint(style.fill, style.fillOpacity)) leaf.style.setProperty("fill", value, "important");
+      if (hasVisiblePaint(style.stroke, style.strokeOpacity)) leaf.style.setProperty("stroke", value, "important");
     });
   }
 
@@ -314,7 +296,7 @@ export class PerformanceEffectLayer {
     const owner = element.ownerSVGElement;
     if (!owner) return PERFORMANCE_RAINBOW_PALETTE.G;
     const signature = stops
-      .map(({ offset, color }) => `${clampedUnit(offset).toFixed(4)}:${color.toUpperCase()}`)
+      .map(({ offset, color }) => `${clampUnit(offset).toFixed(4)}:${color.toUpperCase()}`)
       .join("|");
     const ownerCache = this.gradientCache.get(owner) ?? new Map<string, string>();
     this.gradientCache.set(owner, ownerCache);
@@ -322,13 +304,13 @@ export class PerformanceEffectLayer {
     if (cachedId) return `url(#${cachedId})`;
     let defs = this.gradientContainers.get(owner);
     if (!defs) {
-      defs = svgElement("defs");
+      defs = createSvgElement("defs");
       defs.classList.add("performance-gradient-defs");
       owner.prepend(defs);
       this.gradientDefs.add(defs);
       this.gradientContainers.set(owner, defs);
     }
-    const gradient = svgElement("linearGradient");
+    const gradient = createSvgElement("linearGradient");
     const id = `performance-gradient-${nextGradientId++}`;
     gradient.id = id;
     gradient.setAttribute("x1", "0");
@@ -336,8 +318,8 @@ export class PerformanceEffectLayer {
     gradient.setAttribute("x2", "1");
     gradient.setAttribute("y2", "0");
     stops.forEach(({ offset, color }) => {
-      const stop = svgElement("stop");
-      stop.setAttribute("offset", String(clampedUnit(offset)));
+      const stop = createSvgElement("stop");
+      stop.setAttribute("offset", String(clampUnit(offset)));
       stop.setAttribute("stop-color", color);
       gradient.append(stop);
     });
@@ -368,13 +350,13 @@ export class PerformanceEffectLayer {
       const cloneLeaf = cloneLeaves[index];
       if (!cloneLeaf) return;
       const style = getComputedStyle(leaf);
-      cloneLeaf.style.setProperty("fill", visiblePaint(style.fill, style.fillOpacity) ? "white" : "none", "important");
-      cloneLeaf.style.setProperty("stroke", visiblePaint(style.stroke, style.strokeOpacity) ? "white" : "none", "important");
+      cloneLeaf.style.setProperty("fill", hasVisiblePaint(style.fill, style.fillOpacity) ? "white" : "none", "important");
+      cloneLeaf.style.setProperty("stroke", hasVisiblePaint(style.stroke, style.strokeOpacity) ? "white" : "none", "important");
       cloneLeaf.style.setProperty("opacity", "1", "important");
       cloneLeaf.style.setProperty("fill-opacity", "1", "important");
       cloneLeaf.style.setProperty("stroke-opacity", "1", "important");
     });
-    const container = svgElement("g");
+    const container = createSvgElement("g");
     if (matrix) {
       container.setAttribute(
         "transform",

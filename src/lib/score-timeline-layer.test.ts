@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { growingSpanProgress, revealProgress, tieContinuationVisible } from "./score-timeline-layer";
+import { growingSpanProgress, revealProgress } from "./score-timeline-layer";
 
 describe("score timeline progress", () => {
   it("fades score annotations in over 300 milliseconds", () => {
@@ -12,10 +12,5 @@ describe("score timeline progress", () => {
     expect(growingSpanProgress(900, 1_000, 2_000)).toBe(0);
     expect(growingSpanProgress(1_500, 1_000, 2_000)).toBeCloseTo(0.5);
     expect(growingSpanProgress(2_000, 1_000, 2_000)).toBe(1);
-  });
-
-  it("shows a tie continuation directly at its written start", () => {
-    expect(tieContinuationVisible(1_999, 2_000)).toBe(false);
-    expect(tieContinuationVisible(2_000, 2_000)).toBe(true);
   });
 });

@@ -1,3 +1,11 @@
+import {
+  SVG_GRAPHICS_SELECTOR,
+  clampUnit,
+  createSvgElement,
+  hasVisiblePaint,
+  numericOpacity,
+} from "./svg-graphics";
+
 export type ScoreMaskSource =
   | { kind: "color"; color: string }
   | { kind: "image"; url: string };
@@ -12,8 +20,6 @@ interface MaskGeometrySource {
   previousVisibility: string;
 }
 
-const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
-const GRAPHICS_SELECTOR = "path,rect,line,polyline,polygon,circle,ellipse,text,use";
 let nextMaskId = 0;
 
 function cssPixelValue(style: CSSStyleDeclaration, property: string, fallback: number): number {
@@ -22,23 +28,11 @@ function cssPixelValue(style: CSSStyleDeclaration, property: string, fallback: n
 }
 
 export function normalizedBlackMix(value: number): number {
-  return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
+  return clampUnit(value);
 }
 
 export function paperOpacityFromTransparency(value: number): number {
   return 1 - normalizedBlackMix(value);
-}
-
-function numericOpacity(value: string): number {
-  const parsed = Number.parseFloat(value);
-  return Number.isFinite(parsed) ? parsed : 1;
-}
-
-function hasVisiblePaint(value: string, opacity: string): boolean {
-  return value !== "none"
-    && value !== "transparent"
-    && value !== "rgba(0, 0, 0, 0)"
-    && numericOpacity(opacity) > 0;
 }
 
 function isPageBackground(element: SVGGraphicsElement): boolean {
@@ -60,7 +54,7 @@ function isPageBackground(element: SVGGraphicsElement): boolean {
  * key/time signatures, braces and staff connectors.
  */
 export function collectVisibleScoreMaskElements(container: HTMLElement): SVGGraphicsElement[] {
-  return [...container.querySelectorAll<SVGGraphicsElement>(GRAPHICS_SELECTOR)].filter((element) => {
+  return [...container.querySelectorAll<SVGGraphicsElement>(SVG_GRAPHICS_SELECTOR)].filter((element) => {
     if (element.closest("defs,clipPath,mask,pattern")) return false;
     const style = getComputedStyle(element);
     if (style.display === "none" || style.visibility === "hidden" || numericOpacity(style.opacity) <= 0) {
@@ -79,26 +73,22 @@ export function collectVisibleScoreMaskElements(container: HTMLElement): SVGGrap
   });
 }
 
-function svgElement<K extends keyof SVGElementTagNameMap>(name: K): SVGElementTagNameMap[K] {
-  return document.createElementNS(SVG_NAMESPACE, name);
-}
-
 export class ScoreMaskLayer {
   private readonly maskId = `score-static-mask-${nextMaskId++}`;
   private readonly paperClipId = `${this.maskId}-paper-clip`;
   private readonly overlay = document.createElement("div");
-  private readonly svg = svgElement("svg");
-  private readonly mask = svgElement("mask");
-  private readonly geometry = svgElement("g");
-  private readonly paperClip = svgElement("clipPath");
-  private readonly paperClipRect = svgElement("rect");
-  private readonly foreground = svgElement("g");
-  private readonly backgroundColorRect = svgElement("rect");
-  private readonly backgroundImage = svgElement("image");
-  private readonly paperRect = svgElement("rect");
-  private readonly colorRect = svgElement("rect");
-  private readonly image = svgElement("image");
-  private readonly blackMixRect = svgElement("rect");
+  private readonly svg = createSvgElement("svg");
+  private readonly mask = createSvgElement("mask");
+  private readonly geometry = createSvgElement("g");
+  private readonly paperClip = createSvgElement("clipPath");
+  private readonly paperClipRect = createSvgElement("rect");
+  private readonly foreground = createSvgElement("g");
+  private readonly backgroundColorRect = createSvgElement("rect");
+  private readonly backgroundImage = createSvgElement("image");
+  private readonly paperRect = createSvgElement("rect");
+  private readonly colorRect = createSvgElement("rect");
+  private readonly image = createSvgElement("image");
+  private readonly blackMixRect = createSvgElement("rect");
   private readonly observer: ResizeObserver;
   private sources: MaskGeometrySource[] = [];
 
@@ -116,7 +106,7 @@ export class ScoreMaskLayer {
     this.geometry.classList.add("score-mask-geometry");
     this.mask.append(this.geometry);
 
-    const defs = svgElement("defs");
+    const defs = createSvgElement("defs");
     this.paperClip.id = this.paperClipId;
     this.paperClipRect.classList.add("score-paper-clip");
     this.paperClip.append(this.paperClipRect);

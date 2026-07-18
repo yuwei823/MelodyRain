@@ -27,6 +27,7 @@ export class MediaTransport {
 
   private listeners = new Set<TransportListener>();
   private animationFrame: number | null = null;
+  private frameLoopActive = false;
   private state: TransportState = "idle";
   private preRollTimeMs: number | null = null;
   private preRollStartedAtMs = 0;
@@ -138,16 +139,20 @@ export class MediaTransport {
   };
 
   private startFrameLoop(): void {
-    if (this.animationFrame !== null) return;
+    if (this.frameLoopActive) return;
+    this.frameLoopActive = true;
     const tick = () => {
+      if (!this.frameLoopActive) return;
+      this.animationFrame = null;
       this.advancePreRoll();
       this.emit();
-      this.animationFrame = requestAnimationFrame(tick);
+      if (this.frameLoopActive) this.animationFrame = requestAnimationFrame(tick);
     };
     this.animationFrame = requestAnimationFrame(tick);
   }
 
   private stopFrameLoop(): void {
+    this.frameLoopActive = false;
     if (this.animationFrame === null) return;
     cancelAnimationFrame(this.animationFrame);
     this.animationFrame = null;

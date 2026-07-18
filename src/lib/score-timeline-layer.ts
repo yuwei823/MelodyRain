@@ -4,7 +4,7 @@ import {
   PERFORMANCE_RAINBOW_PALETTE,
   type PerformanceVisuals,
 } from "./performance-effect-layer";
-import type { TimedScoreElement, TimedScoreSpan, TimedTieContinuation } from "./score-renderer";
+import type { TimedScoreElement, TimedScoreSpan } from "./score-renderer";
 
 export const SCORE_REVEAL_DURATION_MS = 300;
 
@@ -16,10 +16,6 @@ export function growingSpanProgress(timeMs: number, startMs: number, endMs: numb
   if (timeMs < startMs) return 0;
   if (endMs <= startMs) return 1;
   return Math.max(0, Math.min(1, (timeMs - startMs) / (endMs - startMs)));
-}
-
-export function tieContinuationVisible(timeMs: number, triggerMs: number): boolean {
-  return timeMs >= triggerMs;
 }
 
 interface RenderedReveal {
@@ -35,23 +31,15 @@ interface RenderedSpan {
   endColor?: string;
 }
 
-interface RenderedTieContinuation {
-  elements: SVGGraphicsElement[];
-  triggerMs: number;
-  staffIndex: number;
-}
-
 export class ScoreTimelineLayer {
   private reveals: RenderedReveal[] = [];
   private spans: RenderedSpan[] = [];
-  private tieContinuations: RenderedTieContinuation[] = [];
 
   constructor(private readonly timeline: MidiTimeline) {}
 
   setElements(
     reveals: TimedScoreElement[],
     spans: TimedScoreSpan[],
-    tieContinuations: TimedTieContinuation[] = [],
   ): void {
     this.dispose();
     this.reveals = reveals.map(({ element, scoreQuarter }) => ({
@@ -65,11 +53,6 @@ export class ScoreTimelineLayer {
       startColor: startPitchStep ? PERFORMANCE_RAINBOW_PALETTE[startPitchStep] : undefined,
       endColor: endPitchStep ? PERFORMANCE_RAINBOW_PALETTE[endPitchStep] : undefined,
     }));
-    this.tieContinuations = tieContinuations.map(({ elements, scoreQuarter, staffIndex }) => ({
-      elements,
-      triggerMs: this.timeline.timeAtScoreQuarter(scoreQuarter),
-      staffIndex,
-    }));
     this.reveals.forEach(({ element }) => {
       element.classList.add("score-reveal-symbol");
       element.style.visibility = "hidden";
@@ -80,14 +63,6 @@ export class ScoreTimelineLayer {
       element.style.visibility = "hidden";
       element.style.opacity = "0";
       element.style.clipPath = "inset(0 100% 0 0)";
-    });
-    this.tieContinuations.forEach(({ elements, staffIndex }) => {
-      const staffClass = staffIndex % 2 === 0 ? "staff-treble" : "staff-bass";
-      elements.forEach((element) => {
-        element.classList.add("tie-continuation-score-symbol", staffClass);
-        element.style.visibility = "hidden";
-        element.style.opacity = "0";
-      });
     });
   }
 
@@ -108,14 +83,6 @@ export class ScoreTimelineLayer {
       element.classList.toggle("is-complete", progress >= 1);
     });
 
-    this.tieContinuations.forEach(({ elements, triggerMs }) => {
-      const isVisible = tieContinuationVisible(timeMs, triggerMs);
-      elements.forEach((element) => {
-        element.style.visibility = isVisible ? "visible" : "hidden";
-        element.style.opacity = isVisible ? "1" : "0";
-        element.classList.toggle("is-sustained", isVisible);
-      });
-    });
   }
 
   performanceVisuals(): PerformanceVisuals {
@@ -123,7 +90,6 @@ export class ScoreTimelineLayer {
       maskElements: [
         ...this.reveals.map(({ element }) => element),
         ...this.spans.map(({ element }) => element),
-        ...this.tieContinuations.flatMap(({ elements }) => elements),
       ],
       paints: [
         ...this.reveals.map(({ element }) => ({
@@ -139,10 +105,6 @@ export class ScoreTimelineLayer {
               : FULL_RAINBOW_STOPS.map((stop) => ({ ...stop })),
           },
         })),
-        ...this.tieContinuations.flatMap(({ elements }) => elements.map((element) => ({
-          element,
-          paint: { kind: "gradient" as const, stops: FULL_RAINBOW_STOPS.map((stop) => ({ ...stop })) },
-        }))),
       ],
     };
   }
@@ -154,18 +116,7 @@ export class ScoreTimelineLayer {
       element.style.removeProperty("opacity");
       element.style.removeProperty("clip-path");
     });
-    this.tieContinuations.flatMap(({ elements }) => elements).forEach((element) => {
-      element.classList.remove(
-        "tie-continuation-score-symbol",
-        "staff-treble",
-        "staff-bass",
-        "is-sustained",
-      );
-      element.style.removeProperty("visibility");
-      element.style.removeProperty("opacity");
-    });
     this.reveals = [];
     this.spans = [];
-    this.tieContinuations = [];
   }
 }

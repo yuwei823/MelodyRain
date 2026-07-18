@@ -61,18 +61,11 @@ export interface TimedScoreSpan {
   endPitchStep?: PitchStep;
 }
 
-export interface TimedTieContinuation {
-  elements: SVGGraphicsElement[];
-  scoreQuarter: number;
-  staffIndex: number;
-}
-
 export interface ScoreRenderResult {
   targets: ScoreTarget[];
   restSymbols: TimedRainSymbol[];
   revealElements: TimedScoreElement[];
   growingSpans: TimedScoreSpan[];
-  tieContinuations: TimedTieContinuation[];
   maskElements: SVGGraphicsElement[];
 }
 
@@ -120,9 +113,8 @@ export class ScoreRenderer {
     }
     const { targets, restSymbols } = this.collectTargets();
     const { revealElements, growingSpans } = this.collectTimedScoreElements(targets);
-    const tieContinuations = this.collectTieContinuations(targets);
     const maskElements = collectVisibleScoreMaskElements(this.container);
-    return { targets, restSymbols, revealElements, growingSpans, tieContinuations, maskElements };
+    return { targets, restSymbols, revealElements, growingSpans, maskElements };
   }
 
   private matchMeasureWidthsToFirstSystem(): boolean {
@@ -370,30 +362,6 @@ export class ScoreRenderer {
     });
 
     return { revealElements: reveals, growingSpans: spans };
-  }
-
-  private collectTieContinuations(targets: ScoreTarget[]): TimedTieContinuation[] {
-    const groups = new Map<string, TimedTieContinuation>();
-
-    targets.filter((target) => target.tieContinuation && target.notation).forEach((target) => {
-      const notation = target.notation!;
-      const key = `${target.staffIndex}:${target.scoreQuarter.toFixed(6)}:${notation.noteElement.id}`;
-      const elements = [notation.noteElement, ...notation.attachedElements, ...notation.beamElements];
-      const existing = groups.get(key);
-      if (existing) {
-        elements.forEach((element) => {
-          if (!existing.elements.includes(element)) existing.elements.push(element);
-        });
-      } else {
-        groups.set(key, {
-          elements: [...new Set(elements)],
-          scoreQuarter: target.scoreQuarter,
-          staffIndex: target.staffIndex,
-        });
-      }
-    });
-
-    return [...groups.values()].sort((left, right) => left.scoreQuarter - right.scoreQuarter);
   }
 
   private targetsForElement(

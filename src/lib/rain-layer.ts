@@ -21,6 +21,10 @@ interface RenderedRainSymbol {
   attackMs: number;
   elements: SVGGraphicsElement[];
   paints: PerformancePaintAssignment[];
+  visibility: "hidden" | "visible";
+  fallOffset: number | null;
+  isHit: boolean;
+  isLanded: boolean;
 }
 
 const FALL_DURATION_MS = 1_200;
@@ -181,7 +185,8 @@ export class RainLayer {
   }
 
   update(timeMs: number): void {
-    for (const { attackMs, elements } of this.symbols) {
+    for (const symbol of this.symbols) {
+      const { attackMs, elements } = symbol;
       const startMs = attackMs - FALL_DURATION_MS;
       const isVisible = timeMs >= startMs;
       const rawProgress = Math.max(0, Math.min(1, (timeMs - startMs) / FALL_DURATION_MS));
@@ -189,12 +194,23 @@ export class RainLayer {
       const isHit = timeMs >= attackMs && timeMs < attackMs + 260;
       const isLanded = timeMs >= attackMs;
 
-      elements.forEach((element) => {
-        element.style.visibility = isVisible ? "visible" : "hidden";
-        element.style.transform = `translateY(${fallOffset}px)`;
-        element.classList.toggle("is-hit", isHit);
-        element.classList.toggle("is-landed", isLanded);
-      });
+      const visibility = isVisible ? "visible" : "hidden";
+      if (visibility !== symbol.visibility) {
+        elements.forEach((element) => { element.style.visibility = visibility; });
+        symbol.visibility = visibility;
+      }
+      if (isVisible && fallOffset !== symbol.fallOffset) {
+        elements.forEach((element) => { element.style.transform = `translateY(${fallOffset}px)`; });
+        symbol.fallOffset = fallOffset;
+      }
+      if (isHit !== symbol.isHit) {
+        elements.forEach((element) => element.classList.toggle("is-hit", isHit));
+        symbol.isHit = isHit;
+      }
+      if (isLanded !== symbol.isLanded) {
+        elements.forEach((element) => element.classList.toggle("is-landed", isLanded));
+        symbol.isLanded = isLanded;
+      }
     }
   }
 
@@ -246,7 +262,15 @@ export class RainLayer {
       element.style.visibility = "hidden";
     });
 
-    return { attackMs, elements: [...new Set(elements)], paints };
+    return {
+      attackMs,
+      elements: [...new Set(elements)],
+      paints,
+      visibility: "hidden",
+      fallOffset: null,
+      isHit: false,
+      isLanded: false,
+    };
   }
 
   private chordPaints(chord: RainChord): PerformancePaintAssignment[] {
