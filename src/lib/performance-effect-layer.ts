@@ -77,6 +77,19 @@ interface MaskClone {
   hitGlow: SVGGraphicsElement;
   baseTop: number;
   baseBottom: number;
+  visible: boolean | null;
+  transform: string;
+  transformOrigin: string;
+  opacity: string;
+  baseOpacity: string;
+  clipPath: string;
+  filter: string;
+  isHit: boolean;
+  isLanded: boolean;
+}
+
+function setStyle(element: SVGGraphicsElement, property: string, value: string): void {
+  if (element.style.getPropertyValue(property) !== value) element.style.setProperty(property, value);
 }
 
 function paintedLeaves(element: SVGGraphicsElement): SVGGraphicsElement[] {
@@ -206,36 +219,68 @@ export class PerformanceEffectLayer {
   update(): void {
     if (this.config.mode !== "mask") return;
     const cameraOffset = Number.parseFloat(
-      getComputedStyle(this.viewport).getPropertyValue("--score-camera-offset-y"),
+      this.viewport.style.getPropertyValue("--score-camera-offset-y"),
     ) || 0;
     const margin = 220;
-    this.maskClones.forEach(({ source, container, content, hitGlow, baseTop, baseBottom }) => {
+    const viewportHeight = this.viewport.clientHeight;
+    this.maskClones.forEach((clone) => {
+      const { source, container, content, hitGlow, baseTop, baseBottom } = clone;
       const insideViewport = baseBottom + cameraOffset >= -margin
-        && baseTop + cameraOffset <= this.viewport.clientHeight + margin;
+        && baseTop + cameraOffset <= viewportHeight + margin;
       if (!insideViewport) {
-        container.style.display = "none";
+        if (clone.visible !== false) container.style.display = "none";
+        clone.visible = false;
         return;
       }
-      const style = getComputedStyle(source);
       const visible = source.isConnected
-        && style.display !== "none"
-        && style.visibility !== "hidden"
-        && numericOpacity(style.opacity) > 0;
-      container.style.display = visible ? "" : "none";
+        && source.style.display !== "none"
+        && source.style.visibility !== "hidden"
+        && numericOpacity(source.style.opacity || "1") > 0;
+      if (visible !== clone.visible) container.style.display = visible ? "" : "none";
+      clone.visible = visible;
       if (!visible) return;
-      content.style.transform = source.style.transform;
-      content.style.transformOrigin = source.style.transformOrigin || "0 0";
-      content.style.opacity = style.opacity;
-      content.style.clipPath = source.style.clipPath;
+      const transform = source.style.transform;
+      const transformOrigin = source.style.transformOrigin || "0 0";
+      const opacity = source.style.opacity || clone.baseOpacity;
+      const clipPath = source.style.clipPath;
       const isHit = source.classList.contains("is-hit");
+      const isLanded = source.classList.contains("is-landed");
+      const filter = isHit
+        ? "drop-shadow(0 0 1px white)"
+        : isLanded !== clone.isLanded || isHit !== clone.isHit
+          ? getComputedStyle(source).filter
+          : clone.filter;
+      if (transform !== clone.transform) {
+        setStyle(content, "transform", transform);
+        setStyle(hitGlow, "transform", transform);
+        clone.transform = transform;
+      }
+      if (transformOrigin !== clone.transformOrigin) {
+        setStyle(content, "transform-origin", transformOrigin);
+        setStyle(hitGlow, "transform-origin", transformOrigin);
+        clone.transformOrigin = transformOrigin;
+      }
+      if (opacity !== clone.opacity) {
+        setStyle(content, "opacity", opacity);
+        clone.opacity = opacity;
+      }
+      if (clipPath !== clone.clipPath) {
+        setStyle(content, "clip-path", clipPath);
+        setStyle(hitGlow, "clip-path", clipPath);
+        clone.clipPath = clipPath;
+      }
       // Keep the stable landed edge on the base clone. Hit brightness and
       // saturation cannot affect a white alpha mask, so the peak is rendered
       // by a separate expanding glow clone instead.
-      content.style.filter = isHit ? "drop-shadow(0 0 1px white)" : style.filter;
-      hitGlow.style.transform = source.style.transform;
-      hitGlow.style.transformOrigin = source.style.transformOrigin || "0 0";
-      hitGlow.style.clipPath = source.style.clipPath;
-      hitGlow.classList.toggle("is-active", isHit);
+      if (filter !== clone.filter) {
+        setStyle(content, "filter", filter);
+        clone.filter = filter;
+      }
+      if (isHit !== clone.isHit) {
+        hitGlow.classList.toggle("is-active", isHit);
+        clone.isHit = isHit;
+      }
+      clone.isLanded = isLanded;
     });
   }
 
@@ -412,6 +457,7 @@ export class PerformanceEffectLayer {
       getComputedStyle(this.viewport).getPropertyValue("--score-camera-offset-y"),
     ) || 0;
     const content = source.cloneNode(true) as SVGGraphicsElement;
+    const sourceStyle = getComputedStyle(source);
     [content, ...content.querySelectorAll<SVGElement>("[id]")].forEach((element) => element.removeAttribute("id"));
     content.removeAttribute("class");
     content.removeAttribute("style");
@@ -446,6 +492,15 @@ export class PerformanceEffectLayer {
       hitGlow,
       baseTop: bounds.top - viewportBounds.top - cameraOffset,
       baseBottom: bounds.bottom - viewportBounds.top - cameraOffset,
+      visible: null,
+      transform: "",
+      transformOrigin: "",
+      opacity: "",
+      baseOpacity: sourceStyle.opacity || "1",
+      clipPath: "",
+      filter: "",
+      isHit: false,
+      isLanded: false,
     };
   }
 

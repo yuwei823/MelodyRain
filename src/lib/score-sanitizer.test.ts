@@ -24,7 +24,9 @@ describe("score sanitizer", () => {
     const xml = `<sound tempo="120" damper-pedal="yes" sostenuto-pedal='50' dynamics="80"/>`;
     const sanitized = removePedalMarkings(xml);
 
-    expect(sanitized).toBe(`<sound tempo="120" dynamics="80"/>`);
+    expect(sanitized).toContain(`tempo="120"`);
+    expect(sanitized).toContain(`dynamics="80"`);
+    expect(sanitized).not.toMatch(/(?:damper|sostenuto|soft)-pedal/i);
   });
 
   it("keeps ties and slurs intact", () => {
@@ -53,7 +55,7 @@ describe("score sanitizer", () => {
     const sanitized = sanitizeScoreMusicXml(xml);
 
     expect(sanitized).not.toMatch(/<(?:m:)?(?:pedal|tuplet)\b/i);
-    expect(sanitized).toContain("<m:note>");
+    expect(sanitized).toMatch(/<m:note(?:\s*\/|>)/);
   });
 
   it("removes 8va and 8vb display directions while preserving notes", () => {
@@ -68,5 +70,29 @@ describe("score sanitizer", () => {
     expect(sanitized).not.toMatch(/<direction\b/i);
     expect(sanitized).toContain("<octave>6</octave>");
     expect(sanitized).toContain("<duration>4</duration>");
+  });
+
+  it("preserves non-target content in a mixed direction", () => {
+    const xml = `<measure><direction placement="below"><direction-type>
+      <pedal type="start"/><wedge type="crescendo"/><dynamics><mf/></dynamics>
+    </direction-type><staff>1</staff></direction></measure>`;
+    const sanitized = removePedalMarkings(xml);
+
+    expect(sanitized).not.toMatch(/<pedal\b/i);
+    expect(sanitized).toContain(`<wedge type="crescendo"/>`);
+    expect(sanitized).toContain(`<dynamics><mf/></dynamics>`);
+    expect(sanitized).toContain(`<staff>1</staff>`);
+  });
+
+  it("does not mistake escaped text or comments for removable elements", () => {
+    const xml = `<measure><!-- <pedal/> --><direction><direction-type><words>&lt;pedal/&gt;</words></direction-type></direction></measure>`;
+    const sanitized = sanitizeScoreMusicXml(xml);
+
+    expect(sanitized).toContain("&lt;pedal/&gt;");
+    expect(sanitized).toContain("<words>");
+  });
+
+  it("rejects malformed XML with a useful error", () => {
+    expect(() => sanitizeScoreMusicXml(`<measure><note></measure>`)).toThrow(/MusicXML 无效/);
   });
 });

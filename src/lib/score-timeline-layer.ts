@@ -21,6 +21,7 @@ export function growingSpanProgress(timeMs: number, startMs: number, endMs: numb
 interface RenderedReveal {
   element: SVGGraphicsElement;
   triggerMs: number;
+  progress: number;
 }
 
 interface RenderedSpan {
@@ -29,6 +30,7 @@ interface RenderedSpan {
   endMs: number;
   startColor?: string;
   endColor?: string;
+  progress: number;
 }
 
 export class ScoreTimelineLayer {
@@ -45,6 +47,7 @@ export class ScoreTimelineLayer {
     this.reveals = reveals.map(({ element, scoreQuarter }) => ({
       element,
       triggerMs: this.timeline.timeAtScoreQuarter(scoreQuarter),
+      progress: Number.NaN,
     }));
     this.spans = spans.map(({ element, startQuarter, endQuarter, startPitchStep, endPitchStep }) => ({
       element,
@@ -52,6 +55,7 @@ export class ScoreTimelineLayer {
       endMs: this.timeline.timeAtScoreQuarter(endQuarter),
       startColor: startPitchStep ? PERFORMANCE_RAINBOW_PALETTE[startPitchStep] : undefined,
       endColor: endPitchStep ? PERFORMANCE_RAINBOW_PALETTE[endPitchStep] : undefined,
+      progress: Number.NaN,
     }));
     this.reveals.forEach(({ element }) => {
       element.classList.add("score-reveal-symbol");
@@ -67,20 +71,26 @@ export class ScoreTimelineLayer {
   }
 
   update(timeMs: number): void {
-    this.reveals.forEach(({ element, triggerMs }) => {
+    this.reveals.forEach((rendered) => {
+      const { element, triggerMs } = rendered;
       const progress = revealProgress(timeMs, triggerMs);
+      if (progress === rendered.progress) return;
       element.style.visibility = progress > 0 ? "visible" : "hidden";
       element.style.opacity = String(progress);
       element.classList.toggle("is-revealed", progress >= 1);
+      rendered.progress = progress;
     });
 
-    this.spans.forEach(({ element, startMs, endMs }) => {
+    this.spans.forEach((rendered) => {
+      const { element, startMs, endMs } = rendered;
       const progress = growingSpanProgress(timeMs, startMs, endMs);
+      if (progress === rendered.progress) return;
       const visibleProgress = progress > 0 ? progress : 0.005;
       element.style.visibility = timeMs >= startMs ? "visible" : "hidden";
       element.style.opacity = timeMs >= startMs ? "1" : "0";
       element.style.clipPath = `inset(0 ${(1 - visibleProgress) * 100}% 0 0)`;
       element.classList.toggle("is-complete", progress >= 1);
+      rendered.progress = progress;
     });
 
   }
