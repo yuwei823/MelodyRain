@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "title": "Ode to Joy",
+  "titleColor": "#25364A",
+  "titleColorMode": "auto",
+  "measuresPerSystem": 2,
+  "backgroundMode": "color",
+  "backgroundColor": "#c2f599",
+  "backgroundImageFile": null,
+  "maskBlackMixPercent": 62,
+  "paperTransparencyPercent": 10,
+  "performanceEffectMode": "rainbow",
+  "performanceMixColor": "#1CAEE8",
+  "performanceMixPercent": 50
+}

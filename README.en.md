@@ -1,0 +1,126 @@
+# MelodyRain
+
+[简体中文](./README.md) | [English](./README.en.md)
+
+MelodyRain is a local-first animated sheet-music application. It reads MusicXML/MXL, MIDI, and MP3 files, then uses a single timeline to drive audio playback, score scrolling, falling notes, and hit effects. Score and performance elements can also reveal a shared background image or color through masks.
+
+The current version focuses on portrait-format previews in the browser. Video export is not implemented yet.
+
+## Features
+
+- Renders SVG sheet music with OpenSheetMusicDisplay;
+- Automatically matches MXL/MusicXML, MIDI, and MP3 files with the same base name in an asset folder;
+- Supports play, pause, rewind, seeking, and `0.5×`, `0.75×`, and `1×` playback speeds;
+- Animates notes, chords, rests, and related notation as they fall, hit, and settle onto the score;
+- Scrolls the score vertically with the active system;
+- Uses a fixed image or solid color as the score mask source, with adjustable black mixing and paper transparency;
+- Offers shared-mask and C–B rainbow styles for performance elements;
+- Supports automatic high-contrast or custom title colors;
+- Allows 1–6 measures per system;
+- Saves project parameters to `melody-rain.settings.json` and restores them when the asset folder is loaded again.
+
+## Requirements
+
+- Node.js `>=20.19 <27`
+- npm
+- A recent version of Chrome or Edge is recommended. When the File System Access API is available, MelodyRain can remember the asset folder and write settings directly into it. Other browsers fall back to folder selection and JSON downloads.
+
+## Quick Start
+
+Install dependencies and start the development servers:
+
+```powershell
+npm install
+npm run dev
+```
+
+Open <http://127.0.0.1:5173>. The Vite development server proxies `/api` requests to the local Express service at `127.0.0.1:4174`.
+
+Click **选择素材文件夹** (Select Asset Folder) and choose this directory from the repository:
+
+```text
+sample/ode-to-joy
+```
+
+The sample contains:
+
+```text
+ode-to-joy-easy-variation.mxl
+ode-to-joy-easy-variation.mid
+ode-to-joy-easy-variation.mp3
+ode-to-joy-easy-variation.pdf
+melody-rain.settings.json
+```
+
+MelodyRain uses the first three files with matching base names to build the project and automatically loads the settings file. The PDF is included only as a reference and is not read by the application. The sample settings use a solid-color background, two measures per system, and rainbow-colored performance elements.
+
+Once parsing and layout are complete, the status changes to **谱面、MIDI 与音频已就绪** (Score, MIDI, and audio are ready), and playback can begin.
+
+## Preparing Your Own Assets
+
+An asset folder must contain at least:
+
+- One score: `.mxl`, `.musicxml`, or `.xml`;
+- One MIDI file: `.mid` or `.midi`;
+- One audio file: `.mp3`.
+
+Using the same base name for all three files is recommended:
+
+```text
+my-song.mxl
+my-song.mid
+my-song.mp3
+```
+
+You may also include `.png`, `.jpg`, `.jpeg`, `.webp`, or `.avif` background images and one `melody-rain.settings.json` file. If there is exactly one candidate for each required asset type, the files can still be loaded when their names differ. If the folder contains multiple groups that cannot be matched unambiguously, MelodyRain stops and reports an error.
+
+The MusicXML, MIDI, and MP3 should come from the same score and export. Otherwise, note animations may not align correctly with the audio.
+
+## Saving and Loading Settings
+
+The **保存参数** (Save Settings) action stores:
+
+- Title, title color, and automatic/custom color mode;
+- Measures per system;
+- Background mode, color, or image filename;
+- Score-mask black mixing and paper transparency;
+- Performance-effect mode, mix color, and mix strength.
+
+The filename is always `melody-rain.settings.json`. If the browser has write access to the asset folder, the file is saved there directly. Otherwise, the browser downloads it and you must move it into the asset folder manually. Use **读取参数** (Load Settings) to reapply the detected settings file or choose another JSON file.
+
+## Production Build
+
+```powershell
+npm run build
+npm start
+```
+
+Then open <http://127.0.0.1:4174>.
+
+## Development and Verification
+
+```powershell
+npm run typecheck
+npm test
+npm run build
+npm run deps:check
+```
+
+Main source directories:
+
+```text
+src/components/   Page controls, playback information, and stage
+src/hooks/        Asset-folder loading workflow
+src/lib/          Score, MIDI, timeline, camera, masks, and animation layers
+src/server/       Local production server
+```
+
+See [MelodyRain_Product_Technical_Spec_v0.1.md](./MelodyRain_Product_Technical_Spec_v0.1.md) for the complete product rules and technical design. The specification is currently available in Chinese.
+
+## Current Limitations
+
+- The current version provides browser previews only; MP4/FFmpeg export is not implemented;
+- Audio is played directly from the supplied MP3; SoundFont/FluidSynth synthesis is not integrated;
+- MusicXML and MIDI are matched against the available score targets, but there is no formal alignment-confidence report or manual correction interface yet;
+- Only a 9:16 portrait stage is available; landscape layouts are not supported;
+- Browsers cannot read arbitrary local paths. The user must select and authorize the asset folder.
