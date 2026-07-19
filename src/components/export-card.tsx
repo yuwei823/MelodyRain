@@ -82,7 +82,7 @@ export function ExportCard({
       >
         {active ? "Cancel export / 取消导出" : "Export video / 导出视频"}
       </button>
-      <small>Export runs locally in this browser. / 视频完全在当前浏览器本地导出。</small>
+      <small>Rendered locally with Chrome and FFmpeg. / 使用本地 Chrome 与 FFmpeg 渲染。</small>
     </section>
   );
 }

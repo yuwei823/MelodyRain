@@ -1,7 +1,19 @@
 import cors from "cors";
 import express from "express";
 import path from "node:path";
+import os from "node:os";
+import { mkdirSync } from "node:fs";
+import multer from "multer";
 import { readAppVersion } from "./app-version.js";
+import {
+  cancelExportJob,
+  createExportJob,
+  exportJob,
+  exportJobManifest,
+  exportJobStatus,
+  removeExportJob,
+  runExportJob,
+} from "./video-export.js";
 
 const host = "127.0.0.1";
 const port = Number(process.env.MELODY_RAIN_PORT ?? 4174);
@@ -9,6 +21,10 @@ const projectRoot = process.cwd();
 const appVersion = readAppVersion(projectRoot);
 const demoRoot = path.join(projectRoot, "sample/ode-to-joy");
 const webRoot = path.join(projectRoot, "dist");
+const exportRoot = path.join(os.tmpdir(), "melody-rain-exports");
+const uploadRoot = path.join(exportRoot, "uploads");
+mkdirSync(uploadRoot, { recursive: true });
+const upload = multer({ dest: uploadRoot, limits: { fileSize: 100 * 1024 * 1024, files: 16 } });
 
 const demoAssets = {
   score: { file: "ode-to-joy-easy-variation.mxl", contentType: "application/vnd.recordare.musicxml" },
@@ -45,6 +61,61 @@ app.get("/api/demo/:asset", (request, response) => {
     return;
   }
   response.type(asset.contentType).sendFile(path.join(demoRoot, asset.file));
+});
+
+app.post("/api/export/jobs", upload.any(), async (request, response) => {
+  try {
+    const files = (request.files as Express.Multer.File[] | undefined) ?? [];
+    const required = ["score", "midi", "audio"];
+    if (required.some((field) => !files.some((file) => file.fieldname === field))) {
+      response.status(400).json({ code: "EXPORT_ASSETS_MISSING" });
+      return;
+    }
+    const job = await createExportJob(exportRoot, files);
+    response.status(202).json(exportJobStatus(job));
+    const appUrl = `http://${host}:${port}`;
+    void runExportJob(job, appUrl);
+  } catch (error) {
+    response.status(500).json({ code: "EXPORT_CREATE_FAILED", message: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+app.get("/api/export/jobs/:id", (request, response) => {
+  const job = exportJob(request.params.id);
+  if (!job) { response.status(404).json({ code: "EXPORT_JOB_NOT_FOUND" }); return; }
+  response.json(exportJobStatus(job));
+});
+
+app.get("/api/export/jobs/:id/manifest", (request, response) => {
+  const job = exportJob(request.params.id);
+  if (!job) { response.status(404).json({ code: "EXPORT_JOB_NOT_FOUND" }); return; }
+  response.json(exportJobManifest(job));
+});
+
+app.get("/api/export/jobs/:id/assets/:index", (request, response) => {
+  const job = exportJob(request.params.id);
+  const asset = job?.assets[Number(request.params.index)];
+  if (!job || !asset) { response.status(404).json({ code: "EXPORT_ASSET_NOT_FOUND" }); return; }
+  response.type(asset.contentType).sendFile(asset.path);
+});
+
+app.get("/api/export/jobs/:id/result", (request, response) => {
+  const job = exportJob(request.params.id);
+  if (!job) { response.status(404).json({ code: "EXPORT_JOB_NOT_FOUND" }); return; }
+  if (job.phase !== "completed") { response.status(409).json({ code: "EXPORT_NOT_COMPLETED" }); return; }
+  response.download(job.outputPath, "melody-rain.mp4");
+});
+
+app.delete("/api/export/jobs/:id", async (request, response) => {
+  const job = exportJob(request.params.id);
+  if (!job) { response.status(404).json({ code: "EXPORT_JOB_NOT_FOUND" }); return; }
+  if (job.phase === "queued" || job.phase === "rendering") {
+    await cancelExportJob(job);
+    response.status(202).json(exportJobStatus(job));
+    return;
+  }
+  await removeExportJob(job);
+  response.status(204).end();
 });
 
 app.use(express.static(webRoot));

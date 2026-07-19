@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { ControlPanel } from "./components/control-panel";
 import { PlaybackPanel } from "./components/playback-panel";
 import { StagePanel } from "./components/stage-panel";
@@ -6,8 +6,9 @@ import { useProjectLoader, type LoadedProject } from "./hooks/use-project-loader
 import { useMediaTransport } from "./hooks/use-media-transport";
 import { useProjectVisualSettings } from "./hooks/use-project-visual-settings";
 import { useScoreStage } from "./hooks/use-score-stage";
-import type { TransportSnapshot } from "./lib/transport";
+import { transportSnapshotAt, type TransportSnapshot } from "./lib/transport";
 import { useVideoExport } from "./hooks/use-video-export";
+import { MidiTimeline } from "./lib/midi";
 
 function stateLabel(state: TransportSnapshot["state"]): string {
   return {
@@ -43,6 +44,7 @@ export default function App() {
     chooseAndLoadAssetFolder,
     readProjectSettings,
     saveProjectSettings,
+    loadExportJob,
   } = useProjectLoader({
     onProjectLoaded: handleProjectLoaded,
     onSettingsLoaded: visual.applyProjectSettings,
@@ -67,11 +69,42 @@ export default function App() {
   } = visual;
   const { snapshot, activeNotes, audioRef } = transport;
   const { targetCount, scoreHostRef, scoreViewportRef, scoreContentClipRef } = stage;
+  const exportJobId = new URLSearchParams(window.location.search).get("exportJob");
+
+  useEffect(() => {
+    if (exportJobId) void loadExportJob(exportJobId);
+  }, [exportJobId, loadExportJob]);
+
+  useEffect(() => {
+    if (!exportJobId) return;
+    document.body.classList.add("export-mode");
+    const exportWindow = window as unknown as {
+      __MELODY_RAIN_EXPORT__?: { renderFrame(timeMs: number): Promise<void> };
+    };
+    if (project && targetCount > 0) {
+      const timeline = new MidiTimeline(project.midi);
+      exportWindow.__MELODY_RAIN_EXPORT__ = {
+        async renderFrame(timeMs: number) {
+          stage.update(transportSnapshotAt(timeline, timeMs, project.midi.durationMs, 1, "playing"));
+          await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+        },
+      };
+      document.documentElement.dataset.exportReady = "true";
+      document.documentElement.dataset.exportDurationMs = String(project.midi.durationMs);
+    }
+    return () => {
+      delete exportWindow.__MELODY_RAIN_EXPORT__;
+      delete document.documentElement.dataset.exportReady;
+      delete document.documentElement.dataset.exportDurationMs;
+      document.body.classList.remove("export-mode");
+    };
+  }, [exportJobId, project, stage.update, targetCount]);
   const videoExport = useVideoExport({
-    project,
-    frameRef: exportFrameRef,
-    updateStage: stage.update,
-    currentSnapshot: snapshot,
+    scoreFile,
+    midiFile,
+    audioFile,
+    backgroundFiles,
+    settings: currentProjectSettings,
     beforeStart: transport.rewind,
   });
 

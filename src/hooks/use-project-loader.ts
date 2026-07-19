@@ -140,6 +140,29 @@ export function useProjectLoader({ onProjectLoaded, onSettingsLoaded }: UseProje
     selectAssetFolderFromFiles(files ? [...files] : []);
   }, [selectAssetFolderFromFiles]);
 
+  const loadExportJob = useCallback(async (jobId: string) => {
+    setStatus("Loading export project… / 正在加载导出项目…");
+    try {
+      const response = await fetch(`/api/export/jobs/${encodeURIComponent(jobId)}/manifest`);
+      if (!response.ok) throw new Error(`Export project unavailable (${response.status}) / 导出项目不可用`);
+      const manifest = await response.json() as {
+        assets: Array<{ field: string; name: string; url: string }>;
+      };
+      const files = await Promise.all(manifest.assets.map(async (asset) => {
+        const assetResponse = await fetch(asset.url);
+        if (!assetResponse.ok) throw new Error(`Unable to load ${asset.name} / 无法加载素材`);
+        return new File([await assetResponse.blob()], asset.name, {
+          type: assetResponse.headers.get("content-type") ?? "application/octet-stream",
+        });
+      }));
+      setFolderName("Export job / 导出任务");
+      selectAssetFolderFromFiles(files);
+    } catch (caught) {
+      setStatus("Export project failed / 导出项目加载失败");
+      setError(caught instanceof Error ? caught.message : String(caught));
+    }
+  }, [selectAssetFolderFromFiles]);
+
   const loadRememberedFolder = useCallback(async () => {
     try {
       const handle = await lastRememberedAssetFolder();
@@ -259,5 +282,6 @@ export function useProjectLoader({ onProjectLoaded, onSettingsLoaded }: UseProje
     chooseAndLoadAssetFolder,
     readProjectSettings,
     saveProjectSettings,
+    loadExportJob,
   };
 }

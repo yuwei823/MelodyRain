@@ -4,14 +4,14 @@
 
 MelodyRain is a local-first animated sheet-music application. It reads MusicXML/MXL, MIDI, and MP3 files, then uses a single timeline to drive audio playback, score scrolling, falling notes, and hit effects. Score and performance elements can also reveal a shared background image or color through masks.
 
-The current version focuses on portrait-format previews in the browser. Video export is not implemented yet.
+The current version supports portrait-format previews in the browser and local MP4 video export.
 
 ## Features
 
 - Renders SVG sheet music with OpenSheetMusicDisplay;
 - Automatically matches MXL/MusicXML, MIDI, and MP3 files with the same base name in an asset folder;
 - Supports play, pause, rewind, seeking, and `0.75×`, `0.8×`, `0.85×`, `0.9×`, and `0.95×` playback speeds;
-- Deterministically renders and exports local `1080 × 1920`, 30 FPS H.264/AAC MP4 video in the browser, with progress and cancellation;
+- Deterministically renders frames with local Chrome and exports `1080 × 1920`, 30 FPS H.264/AAC MP4 video through FFmpeg, with progress and cancellation;
 - Animates notes, chords, rests, and related notation as they fall, hit, and settle onto the score;
 - Scrolls the score vertically with the active system;
 - Uses a fixed image or solid color as the score mask source, with adjustable black mixing and paper transparency;
@@ -123,7 +123,7 @@ See [MelodyRain_Product_Technical_Spec_v0.1.md](./MelodyRain_Product_Technical_S
 
 ## Current Limitations
 
-- The current version provides browser previews only; MP4/FFmpeg export is not implemented;
+- Video export requires a locally installed Chrome or Edge browser and FFmpeg available on `PATH`;
 - Audio is played directly from the supplied MP3; SoundFont/FluidSynth synthesis is not integrated;
 - MusicXML and MIDI are matched against the available score targets, but there is no formal alignment-confidence report or manual correction interface yet;
 - Only a 9:16 portrait stage is available; landscape layouts are not supported;

@@ -968,3 +968,40 @@ select:focus-visible {
 }
 
 @include responsive.styles;
+
+body.export-mode {
+  background: #eef1f5;
+
+  .app-shell {
+    width: 540px;
+    padding: 0;
+  }
+
+  .hero,
+  .control-panel,
+  .playback-panel,
+  .frame-caption {
+    display: none;
+  }
+
+  .workspace-grid {
+    display: block;
+  }
+
+  .stage-panel {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .stage-preview-wrap {
+    padding: 0;
+  }
+
+  .portrait-frame {
+    width: 540px;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
