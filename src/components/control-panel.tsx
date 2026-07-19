@@ -92,8 +92,8 @@ export function ControlPanel({
   onConnectedNoteModeChange,
 }: ControlPanelProps) {
   return (
-    <aside className="control-panel">
-      <div className="folder-picker">
+    <aside className="app-panel control-panel">
+      <div className="ui-card ui-stack folder-picker">
         <div>
           <p className="step-label">SOURCE FOLDER / 素材文件夹</p>
         </div>
@@ -135,7 +135,7 @@ export function ControlPanel({
         </small>
       </div>
 
-      <div className="title-control">
+      <div className="ui-card ui-stack title-control">
         <span className="step-label">TITLE / 画面标题</span>
         <input
           type="text"
@@ -144,7 +144,7 @@ export function ControlPanel({
           onChange={(event) => onCustomTitleChange(event.target.value)}
           aria-label="Display title / 画面标题"
         />
-        <div className="title-color-control">
+        <div className="form-row form-row--color-action title-color-control">
           <span>Title color / 标题颜色</span>
           <input
             type="color"
@@ -163,13 +163,13 @@ export function ControlPanel({
         </div>
       </div>
 
-      <div className="layout-control">
+      <div className="ui-card layout-control">
         <div className="layout-control-heading">
           <div>
             <p className="step-label">LAYOUT / 每行小节数</p>
           </div>
         </div>
-        <div className="layout-options" aria-label="Measures per system / 每行小节数">
+        <div className="segmented-control segmented-control--three layout-options" aria-label="Measures per system / 每行小节数">
           {[1, 2, 3].map((value) => (
             <button
               type="button"
@@ -183,11 +183,11 @@ export function ControlPanel({
         </div>
       </div>
 
-      <div className="background-control">
+      <div className="ui-card ui-stack background-control">
         <div>
           <p className="step-label">BACKGROUND / 谱面背景</p>
         </div>
-        <div className="background-mode" aria-label="Mask background mode / 蒙版背景模式">
+        <div className="segmented-control" aria-label="Mask background mode / 蒙版背景模式">
           <button
             type="button"
             aria-pressed={backgroundMode === "image"}
@@ -205,7 +205,7 @@ export function ControlPanel({
           </button>
         </div>
         {backgroundMode === "image" && project?.backgrounds.length ? (
-          <label>
+          <label className="form-row">
             <span>Background image / 背景图片</span>
             <select
               value={selectedBackgroundIndex}
@@ -219,7 +219,7 @@ export function ControlPanel({
             </select>
           </label>
         ) : (
-          <label className="color-control">
+          <label className="form-row form-row--color color-control">
             <span>Background color / 背景颜色</span>
             <input
               type="color"
@@ -230,7 +230,7 @@ export function ControlPanel({
             <output>{backgroundColor.toUpperCase()}</output>
           </label>
         )}
-        <label className="black-mix-control">
+        <label className="form-row form-row--range black-mix-control">
           <span>Black mix / 黑色混入</span>
           <input
             type="range"
@@ -243,7 +243,7 @@ export function ControlPanel({
           />
           <output>{maskBlackMixPercent}%</output>
         </label>
-        <label className="paper-transparency-control">
+        <label className="form-row form-row--range paper-transparency-control">
           <span>Paper transparency / 谱纸透明度</span>
           <input
             type="range"
@@ -258,11 +258,11 @@ export function ControlPanel({
         </label>
       </div>
 
-      <div className="performance-effect-control">
+      <div className="ui-card ui-stack performance-effect-control">
         <div>
           <p className="step-label">NOTE EFFECT / 音符着色</p>
         </div>
-        <div className="background-mode" aria-label="Note coloring / 音符着色">
+        <div className="segmented-control" aria-label="Note coloring / 音符着色">
           <button
             type="button"
             aria-pressed={performanceEffectMode === "mask"}
@@ -280,7 +280,7 @@ export function ControlPanel({
         </div>
         {performanceEffectMode === "mask" ? (
           <>
-            <label className="color-control">
+            <label className="form-row form-row--color color-control">
               <span>Mix color / 混入颜色</span>
               <input
                 type="color"
@@ -290,7 +290,7 @@ export function ControlPanel({
               />
               <output>{performanceMixColor.toUpperCase()}</output>
             </label>
-            <label className="performance-mix-control">
+            <label className="form-row form-row--range performance-mix-control">
               <span>Mix strength / 混入强度</span>
               <input
                 type="range"
@@ -319,11 +319,11 @@ export function ControlPanel({
         )}
       </div>
 
-      <div className="performance-effect-control">
+      <div className="ui-card ui-stack performance-effect-control connected-notes-control">
         <div>
           <p className="step-label">CONNECTED NOTES / 共享连杆音符</p>
         </div>
-        <div className="background-mode" aria-label="Connected note mode / 共享连杆音符模式">
+        <div className="segmented-control" aria-label="Connected note mode / 共享连杆音符模式">
           <button type="button" aria-pressed={connectedNoteMode === "together"}
             onClick={() => onConnectedNoteModeChange("together")}>Fall together / 一并落下</button>
           <button type="button" aria-pressed={connectedNoteMode === "expand"}

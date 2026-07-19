@@ -11,7 +11,7 @@ interface StagePanelProps {
 
 export function StagePanel({ title, titleColor, scoreViewportRef, scoreContentClipRef, scoreHostRef }: StagePanelProps) {
   return (
-    <section className="stage-panel">
+    <section className="app-panel stage-panel">
       <div className="stage-preview-wrap">
         <div
           className="portrait-frame"

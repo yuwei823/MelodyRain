@@ -30,8 +30,8 @@ export function PlaybackPanel({
   onTempoScaleChange,
 }: PlaybackPanelProps) {
   return (
-    <aside className="playback-panel">
-      <div className="sidebar-transport" aria-label="Playback controls / 播放控制">
+    <aside className="app-panel playback-panel">
+      <div className="ui-card ui-stack sidebar-transport" aria-label="Playback controls / 播放控制">
         <audio ref={audioRef} aria-label="Score audio / 乐谱音频" />
         <div className="sidebar-transport-heading">
           <p className="step-label">PLAYBACK / 播放</p>
@@ -87,7 +87,7 @@ export function PlaybackPanel({
       </div>
 
       {project && (
-        <div className="facts">
+        <div className="ui-card facts">
           <div><span>Score / 乐谱</span><strong>{project.score.title}</strong></div>
           <div><span>Instruments / 乐器</span><strong>{project.score.partNames.join(" · ") || "—"}</strong></div>
           <div><span>Measures / 小节</span><strong>{project.score.measureCount}</strong></div>
