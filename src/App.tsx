@@ -193,7 +193,7 @@ export default function App() {
           exportPhase={videoExport.phase}
           exportProgress={videoExport.progress}
           exportError={videoExport.error}
-          onStartExport={(fileName, quality) => void videoExport.start(fileName, quality)}
+          onStartExport={(fileName, quality, frameRange) => void videoExport.start(fileName, quality, frameRange)}
           onCancelExport={videoExport.cancel}
         />
         <StagePanel

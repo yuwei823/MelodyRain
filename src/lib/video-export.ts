@@ -15,6 +15,11 @@ export interface VideoExportFrame {
   timestampUs: number;
 }
 
+export interface VideoExportFrameRange {
+  startFrame: number;
+  endFrame: number;
+}
+
 export function videoExportFrameCount(
   durationMs: number,
   fps: number = VIDEO_EXPORT_PROFILE.fps,
@@ -34,6 +39,27 @@ export function videoExportFrame(
     sourceTimeMs: presentationTimeMs - TRANSPORT_PRE_ROLL_MS,
     timestampUs: Math.round(presentationTimeMs * 1_000),
   };
+}
+
+export function videoExportCurrentFrame(
+  sourceTimeMs: number,
+  totalFrames: number,
+  fps: number = VIDEO_EXPORT_PROFILE.fps,
+): number {
+  if (totalFrames <= 0) return 0;
+  const presentationTimeMs = Math.max(0, sourceTimeMs + TRANSPORT_PRE_ROLL_MS);
+  return Math.min(totalFrames - 1, Math.floor((presentationTimeMs * fps) / 1_000));
+}
+
+export function validVideoExportFrameRange(
+  range: VideoExportFrameRange,
+  totalFrames: number,
+): boolean {
+  return Number.isInteger(range.startFrame)
+    && Number.isInteger(range.endFrame)
+    && range.startFrame >= 0
+    && range.startFrame < range.endFrame
+    && range.endFrame <= totalFrames;
 }
 
 export function videoExportProgress(completedFrames: number, totalFrames: number): number {

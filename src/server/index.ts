@@ -73,7 +73,13 @@ app.post("/api/export/jobs", upload.any(), async (request, response) => {
       return;
     }
     const quality: ExportQuality = request.body.quality === "standard" ? "standard" : "high";
-    const job = await createExportJob(exportRoot, files, quality);
+    const startFrame = Number(request.body.startFrame);
+    const endFrame = Number(request.body.endFrame);
+    if (!Number.isInteger(startFrame) || !Number.isInteger(endFrame) || startFrame < 0 || startFrame >= endFrame) {
+      response.status(400).json({ code: "EXPORT_FRAME_RANGE_INVALID" });
+      return;
+    }
+    const job = await createExportJob(exportRoot, files, quality, { startFrame, endFrame });
     response.status(202).json(exportJobStatus(job));
     const appUrl = `http://${host}:${port}`;
     void runExportJob(job, appUrl);

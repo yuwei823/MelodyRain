@@ -588,6 +588,58 @@ select:focus-visible {
     }
   }
 
+  .export-frame-range {
+    display: grid;
+    gap: 7px;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+
+    legend,
+    span,
+    small {
+      color: #8da2b8;
+      font-size: 10px;
+    }
+
+    > div {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 7px;
+    }
+
+    label {
+      display: grid;
+      gap: 5px;
+    }
+
+    input {
+      min-width: 0;
+      width: 100%;
+      padding: 8px 9px;
+      border: 1px solid var(--control-border);
+      border-radius: 8px;
+      background: var(--control-bg);
+      color: #a9bed3;
+      font-variant-numeric: tabular-nums;
+    }
+
+    button {
+      justify-self: start;
+      padding: 6px 9px;
+      border: 1px solid var(--control-border);
+      border-radius: 7px;
+      background: var(--control-bg);
+      color: #a9bed3;
+      font-size: 10px;
+    }
+
+    &:disabled {
+      opacity: 0.62;
+    }
+  }
+
   .export-button {
     width: 100%;
     padding: 10px 12px;

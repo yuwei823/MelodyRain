@@ -30,6 +30,8 @@ export interface ExportJob {
   ffmpeg?: ChildProcessWithoutNullStreams;
   cancelled: boolean;
   quality: ExportQuality;
+  startFrame: number;
+  endFrame: number;
 }
 
 const jobs = new Map<string, ExportJob>();
@@ -52,6 +54,7 @@ export async function createExportJob(
   root: string,
   uploaded: Array<{ fieldname: string; originalname: string; path: string; mimetype: string }>,
   quality: ExportQuality,
+  frameRange: { startFrame: number; endFrame: number },
 ): Promise<ExportJob> {
   const id = randomUUID();
   const directory = path.join(root, id);
@@ -80,6 +83,8 @@ export async function createExportJob(
     createdAt: Date.now(),
     cancelled: false,
     quality,
+    startFrame: frameRange.startFrame,
+    endFrame: frameRange.endFrame,
   };
   jobs.set(id, job);
   return job;
@@ -98,6 +103,8 @@ export function exportJobStatus(job: ExportJob) {
     totalFrames: job.totalFrames,
     error: job.error,
     quality: job.quality,
+    startFrame: job.startFrame,
+    endFrame: job.endFrame,
   };
 }
 
@@ -170,22 +177,34 @@ export async function runExportJob(job: ExportJob, appUrl: string): Promise<void
     await page.goto(`${appUrl}/?exportJob=${job.id}`, { waitUntil: "networkidle" });
     await page.waitForFunction(() => document.documentElement.dataset.exportReady === "true", undefined, { timeout: 60_000 });
     const durationMs = await page.evaluate(() => Number(document.documentElement.dataset.exportDurationMs ?? 0));
-    job.totalFrames = Math.ceil(((durationMs + PRE_ROLL_MS) * FPS) / 1_000) + 1;
+    const fullFrameCount = Math.ceil(((durationMs + PRE_ROLL_MS) * FPS) / 1_000) + 1;
+    if (job.startFrame < 0 || job.startFrame >= job.endFrame || job.endFrame > fullFrameCount) {
+      throw new Error(`Invalid export frame range ${job.startFrame}–${job.endFrame}; full range is 0–${fullFrameCount}`);
+    }
+    job.totalFrames = job.endFrame - job.startFrame;
+    const rangeStartSeconds = job.startFrame / FPS;
+    const rangeDurationSeconds = job.totalFrames / FPS;
+    const audioDelaySeconds = Math.max(0, PRE_ROLL_MS / 1_000 - rangeStartSeconds);
+    const audioSeekSeconds = Math.max(0, rangeStartSeconds - PRE_ROLL_MS / 1_000);
     const ffmpeg = spawn("ffmpeg", [
       "-y", "-f", "image2pipe", "-vcodec", "png", "-framerate", String(FPS), "-i", "pipe:0",
-      "-itsoffset", String(PRE_ROLL_MS / 1_000), "-i", audio.path,
+      ...(audioDelaySeconds > 0 ? ["-itsoffset", String(audioDelaySeconds)] : []),
+      ...(audioSeekSeconds > 0 ? ["-ss", String(audioSeekSeconds)] : []),
+      "-i", audio.path,
       "-c:v", "libx264",
       "-preset", job.quality === "high" ? "medium" : "veryfast",
       "-crf", job.quality === "high" ? "18" : "22",
       "-pix_fmt", "yuv420p",
-      "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart", job.outputPath,
+      "-c:a", "aac", "-b:a", "192k", "-t", String(rangeDurationSeconds),
+      "-movflags", "+faststart", job.outputPath,
     ], { stdio: ["pipe", "pipe", "pipe"] });
     job.ffmpeg = ffmpeg;
     const ffmpegDone = waitForProcess(ffmpeg);
     const frameElement = page.locator(".portrait-frame");
     for (let index = 0; index < job.totalFrames; index += 1) {
       if (job.cancelled) throw new Error("EXPORT_CANCELLED");
-      const sourceTimeMs = index * 1_000 / FPS - PRE_ROLL_MS;
+      const absoluteFrame = job.startFrame + index;
+      const sourceTimeMs = absoluteFrame * 1_000 / FPS - PRE_ROLL_MS;
       await page.evaluate(async (timeMs) => {
         const api = (window as unknown as { __MELODY_RAIN_EXPORT__?: { renderFrame(time: number): Promise<void> } }).__MELODY_RAIN_EXPORT__;
         if (!api) throw new Error("Export frame API unavailable");

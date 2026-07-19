@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { serializeProjectSettings, type ProjectSettings } from "../lib/project-settings";
-import type { VideoExportQuality } from "../lib/video-export";
+import type { VideoExportFrameRange, VideoExportQuality } from "../lib/video-export";
 
 export type VideoExportPhase =
   | "idle"
@@ -60,7 +60,11 @@ export function useVideoExport(options: UseVideoExportOptions) {
 
   useEffect(() => () => controllerRef.current?.abort(), []);
 
-  const start = useCallback(async (fileName: string, quality: VideoExportQuality) => {
+  const start = useCallback(async (
+    fileName: string,
+    quality: VideoExportQuality,
+    frameRange: VideoExportFrameRange,
+  ) => {
     if (!options.scoreFile || !options.midiFile || !options.audioFile || controllerRef.current) return;
     const controller = new AbortController();
     controllerRef.current = controller;
@@ -71,6 +75,8 @@ export function useVideoExport(options: UseVideoExportOptions) {
     try {
       const form = new FormData();
       form.append("quality", quality);
+      form.append("startFrame", String(frameRange.startFrame));
+      form.append("endFrame", String(frameRange.endFrame));
       form.append("score", options.scoreFile);
       form.append("midi", options.midiFile);
       form.append("audio", options.audioFile);

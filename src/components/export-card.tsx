@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { formatDuration } from "../lib/format";
-import { VIDEO_EXPORT_PROFILES, videoExportFrameCount, type VideoExportQuality } from "../lib/video-export";
+import {
+  VIDEO_EXPORT_PROFILES,
+  validVideoExportFrameRange,
+  videoExportFrameCount,
+  type VideoExportFrameRange,
+  type VideoExportQuality,
+} from "../lib/video-export";
 import type { VideoExportPhase } from "../hooks/use-video-export";
 
 interface ExportCardProps {
@@ -9,7 +15,7 @@ interface ExportCardProps {
   phase: VideoExportPhase;
   progress: number;
   error: string | null;
-  onStart(fileName: string, quality: VideoExportQuality): void;
+  onStart(fileName: string, quality: VideoExportQuality, frameRange: VideoExportFrameRange): void;
   onCancel(): void;
 }
 
@@ -43,9 +49,17 @@ export function ExportCard({
   const totalFrames = videoExportFrameCount(durationMs);
   const [fileName, setFileName] = useState(exportFileName(projectLabel));
   const [quality, setQuality] = useState<VideoExportQuality>("standard");
+  const [startFrame, setStartFrame] = useState(0);
+  const [endFrame, setEndFrame] = useState(totalFrames);
   const profile = VIDEO_EXPORT_PROFILES[quality];
   const active = phase === "preparing" || phase === "rendering" || phase === "finalizing";
+  const frameRange = { startFrame, endFrame };
+  const validRange = validVideoExportFrameRange(frameRange, totalFrames);
   useEffect(() => { setFileName(exportFileName(projectLabel)); }, [projectLabel]);
+  useEffect(() => {
+    setStartFrame(0);
+    setEndFrame(totalFrames);
+  }, [totalFrames]);
   return (
     <section className="ui-card ui-stack export-card" aria-labelledby="export-card-title">
       <div className="export-card-heading">
@@ -80,6 +94,43 @@ export function ExportCard({
         <div><span>Total frames / 总帧数</span><strong>{durationMs > 0 ? totalFrames : "—"}</strong></div>
       </div>
 
+      <fieldset className="export-frame-range" disabled={active || durationMs <= 0}>
+        <legend>Frame range / 导出帧范围</legend>
+        <div>
+          <label>
+            <span>Start frame / 起始帧</span>
+            <input
+              type="number"
+              min="0"
+              max={Math.max(0, totalFrames - 1)}
+              step="1"
+              value={startFrame}
+              onChange={(event) => setStartFrame(Number(event.target.value))}
+            />
+          </label>
+          <label>
+            <span>End frame / 结束帧</span>
+            <input
+              type="number"
+              min="1"
+              max={totalFrames}
+              step="1"
+              value={endFrame}
+              onChange={(event) => setEndFrame(Number(event.target.value))}
+            />
+          </label>
+        </div>
+        <small>
+          Frames {startFrame}–{endFrame} (end excluded) · {validRange ? endFrame - startFrame : 0} frames / 帧
+        </small>
+        <small>
+          {formatDuration(startFrame * 1_000 / profile.fps)}–{formatDuration(endFrame * 1_000 / profile.fps)}
+        </small>
+        <button type="button" onClick={() => { setStartFrame(0); setEndFrame(totalFrames); }}>
+          Full range / 完整范围
+        </button>
+      </fieldset>
+
       <label className="export-file-name">
         <span>File name / 文件名</span>
         <input
@@ -101,8 +152,8 @@ export function ExportCard({
       <button
         className="export-button"
         type="button"
-        disabled={!active && (!projectLabel || !fileName.trim())}
-        onClick={() => active ? onCancel() : onStart(fileName.trim(), quality)}
+        disabled={!active && (!projectLabel || !fileName.trim() || !validRange)}
+        onClick={() => active ? onCancel() : onStart(fileName.trim(), quality, frameRange)}
       >
         {active ? "Cancel export / 取消导出" : "Export video / 导出视频"}
       </button>

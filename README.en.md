@@ -15,7 +15,7 @@ GPT-5.6, accessed through Codex, was the primary AI model used throughout the cr
 - Renders SVG sheet music with OpenSheetMusicDisplay;
 - Automatically matches MXL/MusicXML, MIDI, and MP3 files with the same base name in an asset folder;
 - Supports play, pause, rewind, seeking, and `0.9×`, `0.95×`, and `1×` playback speeds;
-- Deterministically renders frames with local Chrome and exports 30 FPS H.264/AAC MP4 video through FFmpeg, with standard/high quality, progress, and cancellation;
+- Displays the current absolute export-timeline frame during preview, and deterministically renders selectable frame ranges with local Chrome into 30 FPS H.264/AAC MP4 through FFmpeg, with standard/high quality, progress, and cancellation;
 - Animates notes, chords, rests, and related notation as they fall, hit, and settle onto the score;
 - Uses a three-phase vertical camera: stationary until the active score row reaches the screen midpoint, then smoothly follows that row near the vertical center, and stops early once the complete score ending is visible;
 - Uses a fixed image or solid color as the score mask source, with adjustable black mixing and paper transparency;
@@ -31,6 +31,7 @@ The local Express service creates an export job. Playwright drives an installed 
 
 - Standard quality defaults to `540 × 960` at 30 FPS with a faster encoder preset;
 - High quality outputs `1080 × 1920` at 30 FPS;
+- Full-song export remains the default, while an optional half-open frame range includes the start frame and excludes the end frame; frame numbers include the 1.2-second entrance pre-roll, so frame 36 is source time zero;
 - Full-score export with a 1.2-second falling-note pre-roll;
 - Progress, cancellation, and error reporting;
 - The current display title is the default filename, with Windows-invalid filename characters replaced automatically;

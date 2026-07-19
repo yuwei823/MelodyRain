@@ -5,7 +5,12 @@ import type { TransportSnapshot } from "../lib/transport";
 import type { LoadedProject } from "../hooks/use-project-loader";
 import { ExportCard } from "./export-card";
 import type { VideoExportPhase } from "../hooks/use-video-export";
-import type { VideoExportQuality } from "../lib/video-export";
+import {
+  videoExportCurrentFrame,
+  videoExportFrameCount,
+  type VideoExportFrameRange,
+  type VideoExportQuality,
+} from "../lib/video-export";
 
 interface PlaybackPanelProps {
   project: LoadedProject | null;
@@ -22,7 +27,7 @@ interface PlaybackPanelProps {
   exportPhase: VideoExportPhase;
   exportProgress: number;
   exportError: string | null;
-  onStartExport(fileName: string, quality: VideoExportQuality): void;
+  onStartExport(fileName: string, quality: VideoExportQuality, frameRange: VideoExportFrameRange): void;
   onCancelExport(): void;
 }
 
@@ -44,6 +49,9 @@ export function PlaybackPanel({
   onStartExport,
   onCancelExport,
 }: PlaybackPanelProps) {
+  const exportDurationMs = project?.midi.durationMs ?? 0;
+  const totalFrames = project ? videoExportFrameCount(exportDurationMs) : 0;
+  const currentFrame = videoExportCurrentFrame(snapshot.sourceTimeMs, totalFrames);
   return (
     <aside className="app-panel playback-panel">
       <div className="ui-card ui-stack sidebar-transport" aria-label="Playback controls / 播放控制">
@@ -90,6 +98,7 @@ export function PlaybackPanel({
         <div className="transport-stats">
           <span>{snapshot.effectiveBpm.toFixed(0)} BPM</span>
           <span>♩ {snapshot.scoreQuarter.toFixed(2)}</span>
+          <span>Frame / 当前帧 {project ? `${currentFrame} / ${totalFrames - 1}` : "—"}</span>
         </div>
         <div className="sidebar-active-notes" aria-live="polite">
           <span className="active-label">Active MIDI notes / 当前 MIDI 音符</span>
@@ -103,7 +112,7 @@ export function PlaybackPanel({
 
       <ExportCard
         projectLabel={exportTitle}
-        durationMs={snapshot.durationMs || project?.midi.durationMs}
+        durationMs={exportDurationMs}
         phase={exportPhase}
         progress={exportProgress}
         error={exportError}
