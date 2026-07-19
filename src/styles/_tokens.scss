@@ -1,0 +1,32 @@
+$color-cyan: #76ddff;
+$color-panel: rgba(15, 27, 46, 0.82);
+$color-line: rgba(151, 190, 224, 0.16);
+$color-control-bg: rgba(0, 0, 0, 0.16);
+$color-control-border: rgba(151, 190, 224, 0.2);
+$color-muted: #7890a8;
+$color-card-bg: rgba(5, 14, 26, 0.25);
+$color-selected-bg: #294a67;
+
+$sidebar-width: 342px;
+$workspace-gap: 24px;
+$card-radius: 12px;
+$control-radius: 7px;
+$desktop-breakpoint: 1300px;
+$mobile-breakpoint: 900px;
+$compact-breakpoint: 560px;
+
+:root {
+  font-family: Inter, "Segoe UI Variable", "Microsoft YaHei", sans-serif;
+  color: #eaf2ff;
+  background: #07101d;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  --cyan: #{$color-cyan};
+  --panel: #{$color-panel};
+  --line: #{$color-line};
+  --control-bg: #{$color-control-bg};
+  --control-border: #{$color-control-border};
+  --muted: #{$color-muted};
+  --card-bg: #{$color-card-bg};
+  --selected-bg: #{$color-selected-bg};
+}

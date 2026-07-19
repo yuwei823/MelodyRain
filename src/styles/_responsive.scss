@@ -1,0 +1,34 @@
+@use "tokens" as tokens;
+
+@mixin styles {
+@media (max-width: tokens.$desktop-breakpoint) {
+  .workspace-grid {
+    grid-template-columns: tokens.$sidebar-width minmax(0, 1fr);
+    grid-template-areas: "controls stage" "controls playback";
+  }
+
+  .playback-panel { position: static; }
+}
+
+@media (max-width: tokens.$mobile-breakpoint) {
+  .hero {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .hero-meta { justify-items: start; }
+  .workspace-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas: "controls" "stage" "playback";
+  }
+
+  .control-panel,
+  .playback-panel { position: static; }
+}
+
+@media (max-width: tokens.$compact-breakpoint) {
+  .app-shell { padding-inline: 12px; }
+  .transport-stats { justify-content: flex-start; }
+  .stage-preview-wrap { padding: 10px; }
+}
+}
