@@ -6,6 +6,10 @@ MelodyRain is a local-first animated sheet-music application. It reads MusicXML/
 
 The current version supports portrait-format previews in the browser and local MP4 video export.
 
+## How Codex & GPT-5.6 were used
+
+GPT-5.6, accessed through Codex, was the primary AI model used throughout the creation of Melody Rain. It helped turn the initial emotional concept into the product and technical specification, draft and maintain the README, design the architecture, generate and refactor the React, TypeScript, SCSS, Express, Playwright, and FFmpeg code, write tests, diagnose bugs, and iterate on synchronization, animation, UI, and export behavior. GPT-5.6 was used as a development collaborator across the project rather than as a model embedded in Melody Rain at runtime; the application itself does not currently call the OpenAI API while a user previews or exports a performance.
+
 ## Features
 
 - Renders SVG sheet music with OpenSheetMusicDisplay;
@@ -73,7 +77,7 @@ melody-rain.settings.json
 
 MelodyRain uses the first three files with matching base names to build the project and automatically loads the settings file. The PDF is included only as a reference and is not read by the application. The sample settings use a solid-color background, two measures per system, and rainbow-colored performance elements.
 
-Once parsing and layout are complete, the status changes to **谱面、MIDI 与音频已就绪** (Score, MIDI, and audio are ready), and playback can begin.
+Once parsing and layout are complete, the status changes to **Score, MIDI, and audio are ready / 谱面、MIDI 与音频已就绪**, and playback can begin.
 
 ## Preparing Your Own Assets
 

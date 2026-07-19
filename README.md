@@ -6,6 +6,10 @@ MelodyRain 是一个本地优先的五线谱演奏动画工具。它读取 Music
 
 当前版本支持浏览器内的竖屏预览与本地 MP4 视频导出。
 
+## Codex 与 GPT-5.6 的使用方式
+
+GPT-5.6 通过 Codex 参与了 Melody Rain 的完整创作过程，是项目开发期间使用的主要 AI 模型。它帮助我们将最初的情感构想转化为产品规格和技术规格，起草并持续维护 README，设计项目架构，生成和重构 React、TypeScript、SCSS、Express、Playwright 与 FFmpeg 相关代码，编写测试、诊断问题，并持续迭代同步机制、动画、UI 和视频导出行为。GPT-5.6 在本项目中扮演的是开发协作者，而不是嵌入 Melody Rain 的运行时模型；用户预览或导出演奏视频时，应用目前不会调用 OpenAI API。
+
 ## 功能概览
 
 - 使用 OpenSheetMusicDisplay 渲染 SVG 五线谱；
