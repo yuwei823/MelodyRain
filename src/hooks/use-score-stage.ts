@@ -40,6 +40,7 @@ export function useScoreStage(options: ScoreStageOptions) {
   const maskBlackMixPercentRef = useRef(maskBlackMixPercent);
   const paperTransparencyPercentRef = useRef(paperTransparencyPercent);
   const performanceEffectConfigRef = useRef(performanceEffectConfig);
+  const cameraMotionWindowRef = useRef({ startMs: 0, endMs: 0 });
   maskSourceRef.current = maskSource;
   maskBlackMixPercentRef.current = maskBlackMixPercent;
   paperTransparencyPercentRef.current = paperTransparencyPercent;
@@ -48,7 +49,8 @@ export function useScoreStage(options: ScoreStageOptions) {
   const update = useCallback((snapshot: TransportSnapshot) => {
     rainLayerRef.current?.update(snapshot.sourceTimeMs);
     scoreTimelineLayerRef.current?.update(snapshot.sourceTimeMs);
-    scoreCameraRef.current?.update(snapshot.scoreQuarter);
+    const motion = cameraMotionWindowRef.current;
+    scoreCameraRef.current?.update(snapshot.sourceTimeMs, motion.startMs, motion.endMs);
     performanceEffectLayerRef.current?.update();
   }, []);
 
@@ -101,11 +103,15 @@ export function useScoreStage(options: ScoreStageOptions) {
           maskLayer.setPaperTransparency(paperTransparencyPercentRef.current / 100);
           scoreMaskLayerRef.current = maskLayer;
           const camera = new ScoreCamera(viewport, contentClip, host);
-          camera.setAnchors([
-            ...targets.map((target) => ({ scoreQuarter: target.scoreQuarter, x: target.x, y: target.y })),
-            ...restSymbols.map((rest) => ({ scoreQuarter: rest.scoreQuarter, x: rest.x, y: rest.y })),
-          ]);
-          camera.update(timeline.scoreQuarterAt(timeMs));
+          const visualCenterY = contentClip.clientHeight / 2;
+          const centerTarget = targets
+            .filter((target) => host.offsetTop + target.y >= visualCenterY)
+            .sort((left, right) => left.scoreQuarter - right.scoreQuarter)[0];
+          const startMs = centerTarget ? timeline.timeAtScoreQuarter(centerTarget.scoreQuarter) : 0;
+          const lastAttackMs = project.midi.events.at(-1)?.attackMs ?? project.midi.durationMs;
+          const endMs = Math.max(startMs + 1, lastAttackMs - 1_200);
+          cameraMotionWindowRef.current = { startMs, endMs };
+          camera.update(timeMs, startMs, endMs);
           scoreCameraRef.current = camera;
         }
         setTargetCount(targets.length);

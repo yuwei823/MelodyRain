@@ -85,3 +85,6 @@ Thumbs.db
 # Lock files (optional)
 # package-lock.json
 # yarn.lock
+
+# Output
+*.mp4

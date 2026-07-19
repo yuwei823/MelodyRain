@@ -706,7 +706,6 @@ select:focus-visible {
     var(--score-paper-inset-bottom) var(--score-paper-inset-left);
   color: #10151b;
   will-change: transform;
-  transition: transform 600ms ease-out;
 }
 .score-host svg {
   display: block;
@@ -727,7 +726,6 @@ select:focus-visible {
   transform: translateY(var(--score-camera-offset-y, 0px));
   transform-origin: 0 0;
   will-change: transform;
-  transition: transform 600ms ease-out;
 }
 .performance-mask-layer {
   position: absolute;
@@ -746,7 +744,6 @@ select:focus-visible {
   transform: translateY(var(--score-camera-offset-y, 0px));
   transform-origin: 0 0;
   will-change: transform;
-  transition: transform 600ms ease-out;
 }
 .performance-mask-hit-glow {
   opacity: 0;
