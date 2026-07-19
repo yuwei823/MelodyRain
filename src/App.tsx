@@ -123,7 +123,7 @@ export default function App() {
       <header className="hero">
         <div>
           <h1>Melody Rain</h1>
-          <p className="subtitle">Music in motion / 让音乐流动起来</p>
+          <p className="subtitle">Let music fall into your life again. / 让音乐，再次落进生活。</p>
         </div>
         <div className="hero-meta">
           <div className={`status-pill ${error ? "is-error" : ""}`}>
