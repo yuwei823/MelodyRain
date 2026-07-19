@@ -257,6 +257,19 @@ export function useProjectLoader({ onProjectLoaded, onSettingsLoaded }: UseProje
     }
   }, []);
 
+  const saveVideoToAssetFolder = useCallback(async (blob: Blob, fileName: string): Promise<boolean> => {
+    const handle = directoryHandleRef.current;
+    if (!handle?.getFileHandle) return false;
+    let permission = await handle.queryPermission?.({ mode: "readwrite" });
+    if (permission !== "granted") permission = await handle.requestPermission?.({ mode: "readwrite" });
+    if (permission !== "granted") return false;
+    const fileHandle = await handle.getFileHandle(fileName, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+    return true;
+  }, []);
+
   useEffect(
     () => () => {
       if (project?.revokeAudioUrl) URL.revokeObjectURL(project.audioUrl);
@@ -282,6 +295,7 @@ export function useProjectLoader({ onProjectLoaded, onSettingsLoaded }: UseProje
     chooseAndLoadAssetFolder,
     readProjectSettings,
     saveProjectSettings,
+    saveVideoToAssetFolder,
     loadExportJob,
   };
 }

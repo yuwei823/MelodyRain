@@ -8,6 +8,7 @@ import type { VideoExportPhase } from "../hooks/use-video-export";
 
 interface PlaybackPanelProps {
   project: LoadedProject | null;
+  exportTitle?: string;
   snapshot: TransportSnapshot;
   activeNotes: MidiNoteEvent[];
   targetCount: number;
@@ -26,6 +27,7 @@ interface PlaybackPanelProps {
 
 export function PlaybackPanel({
   project,
+  exportTitle,
   snapshot,
   activeNotes,
   targetCount,
@@ -99,7 +101,7 @@ export function PlaybackPanel({
       </div>
 
       <ExportCard
-        projectLabel={project?.label}
+        projectLabel={exportTitle}
         durationMs={snapshot.durationMs || project?.midi.durationMs}
         phase={exportPhase}
         progress={exportProgress}

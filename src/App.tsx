@@ -44,6 +44,7 @@ export default function App() {
     chooseAndLoadAssetFolder,
     readProjectSettings,
     saveProjectSettings,
+    saveVideoToAssetFolder,
     loadExportJob,
   } = useProjectLoader({
     onProjectLoaded: handleProjectLoaded,
@@ -106,6 +107,7 @@ export default function App() {
     backgroundFiles,
     settings: currentProjectSettings,
     beforeStart: transport.rewind,
+    saveToAssetFolder: saveVideoToAssetFolder,
   });
 
   const togglePlayback = async () => {
@@ -178,6 +180,7 @@ export default function App() {
         />
         <PlaybackPanel
           project={project}
+          exportTitle={customTitle.trim() || project?.score.title || project?.label}
           snapshot={snapshot}
           activeNotes={activeNotes}
           targetCount={targetCount}

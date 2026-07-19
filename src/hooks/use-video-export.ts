@@ -17,6 +17,7 @@ interface UseVideoExportOptions {
   backgroundFiles: File[];
   settings: ProjectSettings;
   beforeStart(): void;
+  saveToAssetFolder(blob: Blob, fileName: string): Promise<boolean>;
 }
 
 interface ExportJobStatus {
@@ -43,6 +44,10 @@ function saveBlob(blob: Blob, fileName: string): void {
   link.download = fileName.toLowerCase().endsWith(".mp4") ? fileName : `${fileName}.mp4`;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function mp4FileName(fileName: string): string {
+  return fileName.toLowerCase().endsWith(".mp4") ? fileName : `${fileName}.mp4`;
 }
 
 export function useVideoExport(options: UseVideoExportOptions) {
@@ -97,9 +102,20 @@ export function useVideoExport(options: UseVideoExportOptions) {
       setPhase("finalizing");
       const resultResponse = await fetch(`/api/export/jobs/${status.id}/result`, { signal: controller.signal });
       if (!resultResponse.ok) throw new Error(`Unable to download video (${resultResponse.status}) / 无法下载视频`);
-      saveBlob(await resultResponse.blob(), fileName);
+      const blob = await resultResponse.blob();
+      const completedFileName = mp4FileName(fileName);
+      let savedToFolder = false;
+      try {
+        savedToFolder = await options.saveToAssetFolder(blob, completedFileName);
+      } catch {
+        savedToFolder = false;
+      }
+      if (!savedToFolder) saveBlob(blob, completedFileName);
       setProgress(1);
       setPhase("completed");
+      window.alert(savedToFolder
+        ? `Export completed and saved to the media folder: ${completedFileName} / 导出完成，已保存到素材文件夹：${completedFileName}`
+        : `Export completed and downloaded: ${completedFileName} / 导出完成，文件已下载：${completedFileName}`);
       void fetch(`/api/export/jobs/${status.id}`, { method: "DELETE" });
     } catch (caught) {
       if (controller.signal.aborted) {
@@ -112,7 +128,7 @@ export function useVideoExport(options: UseVideoExportOptions) {
       controllerRef.current = null;
       jobIdRef.current = null;
     }
-  }, [options.audioFile, options.backgroundFiles, options.beforeStart, options.midiFile, options.scoreFile, options.settings]);
+  }, [options.audioFile, options.backgroundFiles, options.beforeStart, options.midiFile, options.saveToAssetFolder, options.scoreFile, options.settings]);
 
   const cancel = useCallback(() => {
     const jobId = jobIdRef.current;

@@ -14,7 +14,10 @@ interface ExportCardProps {
 }
 
 function exportFileName(projectLabel?: string): string {
-  const baseName = projectLabel?.replace(/\.(mxl|musicxml|xml)$/i, "") || "melody-rain";
+  const baseName = projectLabel
+    ?.replace(/\.(mxl|musicxml|xml)$/i, "")
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_")
+    .replace(/[. ]+$/g, "") || "melody-rain";
   return `${baseName}.mp4`;
 }
 
