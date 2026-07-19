@@ -34,7 +34,7 @@ export function PlaybackPanel({
       <div className="sidebar-transport" aria-label="Playback controls / 播放控制">
         <audio ref={audioRef} aria-label="Score audio / 乐谱音频" />
         <div className="sidebar-transport-heading">
-          <p className="step-label">PLAY</p>
+          <p className="step-label">PLAYBACK / 播放</p>
           <span>{stateLabel}</span>
         </div>
         <div className="playback-buttons">
@@ -60,7 +60,8 @@ export function PlaybackPanel({
         </div>
 
         <div className="speed-group" aria-label="Playback speed / 播放速度">
-          {[0.85, 0.9, 0.95].map((speed) => (
+          <span className="speed-label">Playback speed / 播放速度</span>
+          {[0.9, 0.95, 1].map((speed) => (
             <button
               type="button"
               className={snapshot.tempoScale === speed ? "is-active" : ""}

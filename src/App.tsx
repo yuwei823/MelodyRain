@@ -79,7 +79,7 @@ export default function App() {
       <header className="hero">
         <div>
           <h1>Melody Rain</h1>
-          <p className="subtitle">slogan</p>
+          <p className="subtitle">Music in motion / 让音乐流动起来</p>
         </div>
         <div className="hero-meta">
           <div className={`status-pill ${error ? "is-error" : ""}`}>

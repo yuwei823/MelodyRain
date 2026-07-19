@@ -168,17 +168,19 @@ export function ControlPanel({
           <div>
             <p className="step-label">LAYOUT / 每行小节数</p>
           </div>
-          <output>{measuresPerSystem}</output>
         </div>
-        <input
-          aria-label="Measures per system / 每行小节数"
-          type="range"
-          min="1"
-          max="6"
-          step="1"
-          value={measuresPerSystem}
-          onChange={(event) => onMeasuresPerSystemChange(Number(event.target.value))}
-        />
+        <div className="layout-options" aria-label="Measures per system / 每行小节数">
+          {[1, 2, 3].map((value) => (
+            <button
+              type="button"
+              aria-pressed={measuresPerSystem === value}
+              key={value}
+              onClick={() => onMeasuresPerSystemChange(value)}
+            >
+              {value}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="background-control">
