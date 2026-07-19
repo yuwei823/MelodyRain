@@ -22,6 +22,28 @@ export function preRollSourceTime(elapsedMs: number, playbackRate: number): numb
   return Math.min(0, -TRANSPORT_PRE_ROLL_MS + Math.max(0, elapsedMs) * playbackRate);
 }
 
+export function transportSnapshotAt(
+  timeline: MidiTimeline,
+  sourceTimeMs: number,
+  durationMs: number,
+  tempoScale = 1,
+  state: TransportState = "paused",
+): TransportSnapshot {
+  const safeScale = Math.max(0.5, Math.min(1.5, tempoScale));
+  const tempo = timeline.tempoAt(sourceTimeMs);
+  return {
+    state,
+    presentationTimeMs: sourceTimeMs / safeScale,
+    sourceTimeMs,
+    durationMs,
+    scoreQuarter: timeline.scoreQuarterAt(sourceTimeMs),
+    tempoScale: safeScale,
+    effectiveBpm: tempo.bpm * safeScale,
+    progress: durationMs > 0 ? Math.max(0, sourceTimeMs) / durationMs : 0,
+    activeNoteIds: timeline.activeNotesAt(sourceTimeMs).map((note) => note.id),
+  };
+}
+
 export class MediaTransport {
   readonly audio: HTMLAudioElement;
 
@@ -93,18 +115,7 @@ export class MediaTransport {
     const durationMs = Number.isFinite(this.audio.duration) ? this.audio.duration * 1000 : 0;
     const sourceTimeMs = this.preRollTimeMs
       ?? (this.state === "idle" && this.audio.currentTime === 0 ? -TRANSPORT_PRE_ROLL_MS - 1 : this.audio.currentTime * 1000);
-    const tempo = this.timeline.tempoAt(sourceTimeMs);
-    return {
-      state: this.state,
-      presentationTimeMs: sourceTimeMs / this.audio.playbackRate,
-      sourceTimeMs,
-      durationMs,
-      scoreQuarter: this.timeline.scoreQuarterAt(sourceTimeMs),
-      tempoScale: this.audio.playbackRate,
-      effectiveBpm: tempo.bpm * this.audio.playbackRate,
-      progress: durationMs > 0 ? Math.max(0, sourceTimeMs) / durationMs : 0,
-      activeNoteIds: this.timeline.activeNotesAt(sourceTimeMs).map((note) => note.id),
-    };
+    return transportSnapshotAt(this.timeline, sourceTimeMs, durationMs, this.audio.playbackRate, this.state);
   }
 
   dispose(): void {

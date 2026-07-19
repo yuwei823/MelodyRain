@@ -11,6 +11,7 @@ The current version focuses on portrait-format previews in the browser. Video ex
 - Renders SVG sheet music with OpenSheetMusicDisplay;
 - Automatically matches MXL/MusicXML, MIDI, and MP3 files with the same base name in an asset folder;
 - Supports play, pause, rewind, seeking, and `0.75×`, `0.8×`, `0.85×`, `0.9×`, and `0.95×` playback speeds;
+- Deterministically renders and exports local `1080 × 1920`, 30 FPS H.264/AAC MP4 video in the browser, with progress and cancellation;
 - Animates notes, chords, rests, and related notation as they fall, hit, and settle onto the score;
 - Scrolls the score vertically with the active system;
 - Uses a fixed image or solid color as the score mask source, with adjustable black mixing and paper transparency;

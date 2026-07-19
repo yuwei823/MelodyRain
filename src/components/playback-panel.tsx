@@ -3,6 +3,8 @@ import { formatDuration } from "../lib/format";
 import type { MidiNoteEvent } from "../lib/midi";
 import type { TransportSnapshot } from "../lib/transport";
 import type { LoadedProject } from "../hooks/use-project-loader";
+import { ExportCard } from "./export-card";
+import type { VideoExportPhase } from "../hooks/use-video-export";
 
 interface PlaybackPanelProps {
   project: LoadedProject | null;
@@ -15,6 +17,11 @@ interface PlaybackPanelProps {
   onRewind(): void;
   onSeek(progress: number): void;
   onTempoScaleChange(scale: number): void;
+  exportPhase: VideoExportPhase;
+  exportProgress: number;
+  exportError: string | null;
+  onStartExport(fileName: string): void;
+  onCancelExport(): void;
 }
 
 export function PlaybackPanel({
@@ -28,6 +35,11 @@ export function PlaybackPanel({
   onRewind,
   onSeek,
   onTempoScaleChange,
+  exportPhase,
+  exportProgress,
+  exportError,
+  onStartExport,
+  onCancelExport,
 }: PlaybackPanelProps) {
   return (
     <aside className="app-panel playback-panel">
@@ -85,6 +97,16 @@ export function PlaybackPanel({
           </div>
         </div>
       </div>
+
+      <ExportCard
+        projectLabel={project?.label}
+        durationMs={snapshot.durationMs || project?.midi.durationMs}
+        phase={exportPhase}
+        progress={exportProgress}
+        error={exportError}
+        onStart={onStartExport}
+        onCancel={onCancelExport}
+      />
 
       {project && (
         <div className="ui-card facts">

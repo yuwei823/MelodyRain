@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { MidiTimeline, type MidiSummary } from "./midi";
-import { MediaTransport, preRollSourceTime, TRANSPORT_PRE_ROLL_MS } from "./transport";
+import { MediaTransport, preRollSourceTime, TRANSPORT_PRE_ROLL_MS, transportSnapshotAt } from "./transport";
 
 const EMPTY_MIDI: MidiSummary = {
   durationMs: 10_000,
@@ -36,6 +36,14 @@ class FakeAudio extends EventTarget {
 }
 
 describe("transport pre-roll", () => {
+  it("builds deterministic snapshots for offline rendering", () => {
+    const snapshot = transportSnapshotAt(new MidiTimeline(EMPTY_MIDI), 500, 2_000, 0.9);
+    expect(snapshot.sourceTimeMs).toBe(500);
+    expect(snapshot.progress).toBe(0.25);
+    expect(snapshot.tempoScale).toBe(0.9);
+    expect(snapshot.effectiveBpm).toBe(108);
+  });
+
   it("advances from negative source time to the first audio frame", () => {
     expect(preRollSourceTime(0, 1)).toBe(-TRANSPORT_PRE_ROLL_MS);
     expect(preRollSourceTime(600, 1)).toBe(-600);

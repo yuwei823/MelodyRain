@@ -7,6 +7,7 @@ import { useMediaTransport } from "./hooks/use-media-transport";
 import { useProjectVisualSettings } from "./hooks/use-project-visual-settings";
 import { useScoreStage } from "./hooks/use-score-stage";
 import type { TransportSnapshot } from "./lib/transport";
+import { useVideoExport } from "./hooks/use-video-export";
 
 function stateLabel(state: TransportSnapshot["state"]): string {
   return {
@@ -19,6 +20,7 @@ function stateLabel(state: TransportSnapshot["state"]): string {
 
 export default function App() {
   const visual = useProjectVisualSettings();
+  const exportFrameRef = useRef<HTMLDivElement>(null);
 
   const handleProjectLoaded = useCallback((nextProject: LoadedProject) => {
     visual.adoptProjectSettings(nextProject);
@@ -65,6 +67,13 @@ export default function App() {
   } = visual;
   const { snapshot, activeNotes, audioRef } = transport;
   const { targetCount, scoreHostRef, scoreViewportRef, scoreContentClipRef } = stage;
+  const videoExport = useVideoExport({
+    project,
+    frameRef: exportFrameRef,
+    updateStage: stage.update,
+    currentSnapshot: snapshot,
+    beforeStart: transport.rewind,
+  });
 
   const togglePlayback = async () => {
     try {
@@ -145,6 +154,11 @@ export default function App() {
           onRewind={transport.rewind}
           onSeek={transport.seek}
           onTempoScaleChange={transport.setTempoScale}
+          exportPhase={videoExport.phase}
+          exportProgress={videoExport.progress}
+          exportError={videoExport.error}
+          onStartExport={(fileName) => void videoExport.start(fileName)}
+          onCancelExport={videoExport.cancel}
         />
         <StagePanel
           title={customTitle.trim() || project?.label || "Waiting for media / 等待素材"}
@@ -152,6 +166,7 @@ export default function App() {
           scoreViewportRef={scoreViewportRef}
           scoreContentClipRef={scoreContentClipRef}
           scoreHostRef={scoreHostRef}
+          exportFrameRef={exportFrameRef}
         />
       </section>
     </main>
