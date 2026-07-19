@@ -17,7 +17,7 @@ GPT-5.6, accessed through Codex, was the primary AI model used throughout the cr
 - Supports play, pause, rewind, seeking, and `0.9×`, `0.95×`, and `1×` playback speeds;
 - Deterministically renders frames with local Chrome and exports 30 FPS H.264/AAC MP4 video through FFmpeg, with standard/high quality, progress, and cancellation;
 - Animates notes, chords, rests, and related notation as they fall, hit, and settle onto the score;
-- Uses a three-phase vertical camera: stationary until the performance reaches the screen midpoint, constant-speed scrolling, then a stationary end phase after the score reaches its maximum offset;
+- Uses a three-phase vertical camera: stationary until the active score row reaches the screen midpoint, then smoothly follows that row near the vertical center, and stops early once the complete score ending is visible;
 - Uses a fixed image or solid color as the score mask source, with adjustable black mixing and paper transparency;
 - Offers shared-mask and C–B rainbow styles for performance elements;
 - Lets beamed note groups fall together or expand left to right after the first note lands;

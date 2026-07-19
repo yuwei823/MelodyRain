@@ -28,7 +28,7 @@ export function useProjectVisualSettings() {
   const [titleColor, setTitleColor] = useState(DARK_TITLE_COLOR);
   const [titleColorMode, setTitleColorMode] = useState<TitleColorMode>("auto");
   const [measuresPerSystem, setMeasuresPerSystem] = useState(PORTRAIT_RENDER_PROFILE.measuresPerSystem);
-  const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>("color");
+  const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>("image");
   const [backgroundColor, setBackgroundColor] = useState(DEFAULT_BACKGROUND_COLOR);
   const [maskBlackMixPercent, setMaskBlackMixPercent] = useState(DEFAULT_MASK_BLACK_MIX_PERCENT);
   const [paperTransparencyPercent, setPaperTransparencyPercent] = useState(DEFAULT_PAPER_TRANSPARENCY_PERCENT);

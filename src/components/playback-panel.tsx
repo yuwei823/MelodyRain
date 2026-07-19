@@ -49,7 +49,7 @@ export function PlaybackPanel({
       <div className="ui-card ui-stack sidebar-transport" aria-label="Playback controls / 播放控制">
         <audio ref={audioRef} aria-label="Score audio / 乐谱音频" />
         <div className="sidebar-transport-heading">
-          <p className="step-label">PLAYBACK / 播放</p>
+          <p className="step-label">PREVIEW / 预览</p>
           <span>{stateLabel}</span>
         </div>
         <div className="playback-buttons">

@@ -40,7 +40,7 @@ export function useScoreStage(options: ScoreStageOptions) {
   const maskBlackMixPercentRef = useRef(maskBlackMixPercent);
   const paperTransparencyPercentRef = useRef(paperTransparencyPercent);
   const performanceEffectConfigRef = useRef(performanceEffectConfig);
-  const cameraMotionWindowRef = useRef({ startMs: 0, endMs: 0 });
+  const midiTimelineRef = useRef<MidiTimeline | null>(null);
   maskSourceRef.current = maskSource;
   maskBlackMixPercentRef.current = maskBlackMixPercent;
   paperTransparencyPercentRef.current = paperTransparencyPercent;
@@ -49,8 +49,7 @@ export function useScoreStage(options: ScoreStageOptions) {
   const update = useCallback((snapshot: TransportSnapshot) => {
     rainLayerRef.current?.update(snapshot.sourceTimeMs);
     scoreTimelineLayerRef.current?.update(snapshot.sourceTimeMs);
-    const motion = cameraMotionWindowRef.current;
-    scoreCameraRef.current?.update(snapshot.sourceTimeMs, motion.startMs, motion.endMs);
+    scoreCameraRef.current?.update(midiTimelineRef.current?.scoreQuarterAt(snapshot.sourceTimeMs) ?? 0);
     performanceEffectLayerRef.current?.update();
   }, []);
 
@@ -64,6 +63,7 @@ export function useScoreStage(options: ScoreStageOptions) {
         scoreMaskLayerRef.current, performanceEffectLayerRef.current].forEach((layer) => layer?.dispose());
       rainLayerRef.current = null;
       scoreTimelineLayerRef.current = null;
+      midiTimelineRef.current = null;
       scoreCameraRef.current = null;
       scoreMaskLayerRef.current = null;
       performanceEffectLayerRef.current = null;
@@ -79,6 +79,7 @@ export function useScoreStage(options: ScoreStageOptions) {
       .then(({ targets, restSymbols, revealElements, growingSpans, maskElements }) => {
         if (cancelled) return;
         const timeline = new MidiTimeline(project.midi);
+        midiTimelineRef.current = timeline;
         const rainLayer = new RainLayer(host, timeline);
         rainLayer.setEvents(project.midi.events, targets, restSymbols, connectedNoteMode);
         const timeMs = currentSourceTimeMs() ?? -TRANSPORT_PRE_ROLL_MS - 1;
@@ -103,15 +104,20 @@ export function useScoreStage(options: ScoreStageOptions) {
           maskLayer.setPaperTransparency(paperTransparencyPercentRef.current / 100);
           scoreMaskLayerRef.current = maskLayer;
           const camera = new ScoreCamera(viewport, contentClip, host);
-          const visualCenterY = contentClip.clientHeight / 2;
-          const centerTarget = targets
-            .filter((target) => host.offsetTop + target.y >= visualCenterY)
-            .sort((left, right) => left.scoreQuarter - right.scoreQuarter)[0];
-          const startMs = centerTarget ? timeline.timeAtScoreQuarter(centerTarget.scoreQuarter) : 0;
-          const lastAttackMs = project.midi.events.at(-1)?.attackMs ?? project.midi.durationMs;
-          const endMs = Math.max(startMs + 1, lastAttackMs - 1_200);
-          cameraMotionWindowRef.current = { startMs, endMs };
-          camera.update(timeMs, startMs, endMs);
+          camera.setAnchors([
+            ...targets.map((target) => ({
+              scoreQuarter: target.scoreQuarter,
+              x: target.x,
+              y: target.y,
+              height: target.height,
+            })),
+            ...restSymbols.map((rest) => ({
+              scoreQuarter: rest.scoreQuarter,
+              x: rest.x,
+              y: rest.y,
+            })),
+          ]);
+          camera.update(timeline.scoreQuarterAt(timeMs));
           scoreCameraRef.current = camera;
         }
         setTargetCount(targets.length);

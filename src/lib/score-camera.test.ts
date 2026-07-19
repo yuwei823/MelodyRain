@@ -1,21 +1,39 @@
 import { describe, expect, it } from "vitest";
-import { uniformVerticalCameraOffset } from "./score-camera";
+import { systemFollowingCameraOffset } from "./score-camera";
 
-describe("uniform vertical score camera", () => {
-  it("moves linearly over the complete playback duration", () => {
-    expect(uniformVerticalCameraOffset(2_000, 2_000, 8_000, 600, 1_500)).toBe(0);
-    expect(uniformVerticalCameraOffset(3_500, 2_000, 8_000, 600, 1_500)).toBe(225);
-    expect(uniformVerticalCameraOffset(5_000, 2_000, 8_000, 600, 1_500)).toBe(450);
-    expect(uniformVerticalCameraOffset(8_000, 2_000, 8_000, 600, 1_500)).toBe(900);
+const anchors = [
+  { scoreQuarter: 0, x: 20, y: 100 },
+  { scoreQuarter: 4, x: 120, y: 100 },
+  { scoreQuarter: 8, x: 20, y: 500 },
+  { scoreQuarter: 12, x: 120, y: 500 },
+  { scoreQuarter: 16, x: 20, y: 900 },
+  { scoreQuarter: 20, x: 120, y: 900 },
+  { scoreQuarter: 24, x: 20, y: 1_300 },
+];
+
+describe("score-system-following vertical camera", () => {
+  it("does not move before the active row reaches the vertical center", () => {
+    expect(systemFollowingCameraOffset(anchors, 0, 800, 2_000)).toBe(0);
+    expect(systemFollowingCameraOffset(anchors, 7.9, 800, 2_000)).toBe(0);
   });
 
-  it("clamps before playback and after the score ends", () => {
-    expect(uniformVerticalCameraOffset(1_000, 2_000, 8_000, 600, 1_500)).toBe(0);
-    expect(uniformVerticalCameraOffset(10_000, 2_000, 8_000, 600, 1_500)).toBe(900);
+  it("centers the active row and remains stable while that row is playing", () => {
+    expect(systemFollowingCameraOffset(anchors, 8.5, 800, 2_000)).toBe(100);
+    expect(systemFollowingCameraOffset(anchors, 12, 800, 2_000)).toBe(100);
   });
 
-  it("does not move when scrolling is unnecessary or timing is unavailable", () => {
-    expect(uniformVerticalCameraOffset(5_000, 2_000, 8_000, 600, 500)).toBe(0);
-    expect(uniformVerticalCameraOffset(5_000, 2_000, 2_000, 600, 1_500)).toBe(0);
+  it("smoothly transitions after the active row changes", () => {
+    expect(systemFollowingCameraOffset(anchors, 16, 800, 2_000)).toBe(100);
+    expect(systemFollowingCameraOffset(anchors, 16.25, 800, 2_000)).toBe(300);
+    expect(systemFollowingCameraOffset(anchors, 16.5, 800, 2_000)).toBe(500);
+  });
+
+  it("stops early when the complete score bottom is visible", () => {
+    expect(systemFollowingCameraOffset(anchors, 24.5, 800, 1_600)).toBe(800);
+    expect(systemFollowingCameraOffset(anchors, 30, 800, 1_600)).toBe(800);
+  });
+
+  it("does not scroll when the score fits in the viewport", () => {
+    expect(systemFollowingCameraOffset(anchors, 20, 2_000, 1_600)).toBe(0);
   });
 });
