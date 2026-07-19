@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { ControlPanel } from "./components/control-panel";
 import { PlaybackPanel } from "./components/playback-panel";
 import { StagePanel } from "./components/stage-panel";
@@ -9,6 +9,7 @@ import { useScoreStage } from "./hooks/use-score-stage";
 import { transportSnapshotAt, type TransportSnapshot } from "./lib/transport";
 import { useVideoExport } from "./hooks/use-video-export";
 import { MidiTimeline } from "./lib/midi";
+import { videoExportFrameCount } from "./lib/video-export";
 
 function stateLabel(state: TransportSnapshot["state"]): string {
   return {
@@ -22,6 +23,10 @@ function stateLabel(state: TransportSnapshot["state"]): string {
 export default function App() {
   const visual = useProjectVisualSettings();
   const exportFrameRef = useRef<HTMLDivElement>(null);
+  const frameColorRangeSettings = useMemo(() => ({
+    transitionFrames: visual.frameColorTransitionFrames,
+    ranges: visual.performanceColorRanges,
+  }), [visual.frameColorTransitionFrames, visual.performanceColorRanges]);
 
   const handleProjectLoaded = useCallback((nextProject: LoadedProject) => {
     visual.adoptProjectSettings(nextProject);
@@ -56,6 +61,7 @@ export default function App() {
     maskSource: visual.maskSource, maskBlackMixPercent: visual.maskBlackMixPercent,
     paperTransparencyPercent: visual.paperTransparencyPercent,
     performanceEffectConfig: visual.performanceEffectConfig,
+    frameColorRangeSettings,
     connectedNoteMode: visual.connectedNoteMode,
     currentSourceTimeMs: transport.currentSourceTimeMs, setStatus, setError });
   stageUpdateRef.current = stage.update;
@@ -63,10 +69,11 @@ export default function App() {
     customTitle, setCustomTitle, titleColor, setTitleColor, titleColorMode, setTitleColorMode,
     measuresPerSystem, setMeasuresPerSystem, backgroundMode, setBackgroundMode, backgroundColor,
     setBackgroundColor, maskBlackMixPercent, setMaskBlackMixPercent, paperTransparencyPercent,
-    setPaperTransparencyPercent, performanceEffectMode, setPerformanceEffectMode, performanceMixColor,
-    setPerformanceMixColor, performanceMixPercent, setPerformanceMixPercent, selectedBackgroundIndex,
+    setPaperTransparencyPercent, performanceMixPercent, setPerformanceMixPercent, selectedBackgroundIndex,
     setSelectedBackgroundIndex, currentProjectSettings,
     connectedNoteMode, setConnectedNoteMode,
+    frameColorTransitionFrames, setFrameColorTransitionFrames,
+    performanceColorRanges, setPerformanceColorRanges,
   } = visual;
   const { snapshot, activeNotes, audioRef } = transport;
   const { targetCount, scoreHostRef, scoreViewportRef, scoreContentClipRef } = stage;
@@ -169,14 +176,15 @@ export default function App() {
           onMaskBlackMixPercentChange={setMaskBlackMixPercent}
           paperTransparencyPercent={paperTransparencyPercent}
           onPaperTransparencyPercentChange={setPaperTransparencyPercent}
-          performanceEffectMode={performanceEffectMode}
-          onPerformanceEffectModeChange={setPerformanceEffectMode}
-          performanceMixColor={performanceMixColor}
-          onPerformanceMixColorChange={setPerformanceMixColor}
           performanceMixPercent={performanceMixPercent}
           onPerformanceMixPercentChange={setPerformanceMixPercent}
           connectedNoteMode={connectedNoteMode}
           onConnectedNoteModeChange={setConnectedNoteMode}
+          frameColorTransitionFrames={frameColorTransitionFrames}
+          performanceColorRanges={performanceColorRanges}
+          totalFrames={project ? videoExportFrameCount(project.midi.durationMs) : 0}
+          onFrameColorTransitionFramesChange={setFrameColorTransitionFrames}
+          onPerformanceColorRangesChange={setPerformanceColorRanges}
         />
         <PlaybackPanel
           project={project}

@@ -7,6 +7,8 @@ import { ScoreCamera } from "../lib/score-camera";
 import { ScoreMaskLayer, type ScoreMaskSource } from "../lib/score-mask-layer";
 import { ScoreRenderer } from "../lib/score-renderer";
 import { ScoreTimelineLayer } from "../lib/score-timeline-layer";
+import { resolveFrameColorConfig, type FrameColorRangeSettings } from "../lib/frame-color-ranges";
+import { videoExportCurrentFrame, videoExportFrameCount } from "../lib/video-export";
 import { TRANSPORT_PRE_ROLL_MS, type TransportSnapshot } from "../lib/transport";
 import type { LoadedProject } from "./use-project-loader";
 import type { ConnectedNoteMode } from "../lib/project-settings";
@@ -18,6 +20,7 @@ interface ScoreStageOptions {
   maskBlackMixPercent: number;
   paperTransparencyPercent: number;
   performanceEffectConfig: PerformanceEffectConfig;
+  frameColorRangeSettings: FrameColorRangeSettings;
   connectedNoteMode: ConnectedNoteMode;
   currentSourceTimeMs(): number;
   setStatus(status: string): void;
@@ -26,7 +29,7 @@ interface ScoreStageOptions {
 
 export function useScoreStage(options: ScoreStageOptions) {
   const { project, measuresPerSystem, maskSource, maskBlackMixPercent, paperTransparencyPercent,
-    performanceEffectConfig, connectedNoteMode, currentSourceTimeMs, setStatus, setError } = options;
+    performanceEffectConfig, frameColorRangeSettings, connectedNoteMode, currentSourceTimeMs, setStatus, setError } = options;
   const [targetCount, setTargetCount] = useState(0);
   const scoreHostRef = useRef<HTMLDivElement>(null);
   const scoreViewportRef = useRef<HTMLDivElement>(null);
@@ -40,16 +43,25 @@ export function useScoreStage(options: ScoreStageOptions) {
   const maskBlackMixPercentRef = useRef(maskBlackMixPercent);
   const paperTransparencyPercentRef = useRef(paperTransparencyPercent);
   const performanceEffectConfigRef = useRef(performanceEffectConfig);
+  const frameColorRangeSettingsRef = useRef(frameColorRangeSettings);
   const midiTimelineRef = useRef<MidiTimeline | null>(null);
   maskSourceRef.current = maskSource;
   maskBlackMixPercentRef.current = maskBlackMixPercent;
   paperTransparencyPercentRef.current = paperTransparencyPercent;
   performanceEffectConfigRef.current = performanceEffectConfig;
+  frameColorRangeSettingsRef.current = frameColorRangeSettings;
 
   const update = useCallback((snapshot: TransportSnapshot) => {
     rainLayerRef.current?.update(snapshot.sourceTimeMs);
     scoreTimelineLayerRef.current?.update(snapshot.sourceTimeMs);
     scoreCameraRef.current?.update(midiTimelineRef.current?.scoreQuarterAt(snapshot.sourceTimeMs) ?? 0);
+    const totalFrames = videoExportFrameCount(snapshot.durationMs);
+    const frame = videoExportCurrentFrame(snapshot.sourceTimeMs, totalFrames);
+    performanceEffectLayerRef.current?.setConfig(resolveFrameColorConfig(
+      frame,
+      performanceEffectConfigRef.current,
+      frameColorRangeSettingsRef.current,
+    ));
     performanceEffectLayerRef.current?.update();
   }, []);
 
@@ -137,7 +149,15 @@ export function useScoreStage(options: ScoreStageOptions) {
     scoreMaskLayerRef.current?.setSource(maskSource);
     performanceEffectLayerRef.current?.setSource(maskSource);
   }, [maskSource]);
-  useEffect(() => { performanceEffectLayerRef.current?.setConfig(performanceEffectConfig); }, [performanceEffectConfig]);
+  useEffect(() => {
+    const sourceTimeMs = currentSourceTimeMs();
+    const totalFrames = videoExportFrameCount(project?.midi.durationMs ?? 0);
+    performanceEffectLayerRef.current?.setConfig(resolveFrameColorConfig(
+      videoExportCurrentFrame(sourceTimeMs, totalFrames),
+      performanceEffectConfig,
+      frameColorRangeSettings,
+    ));
+  }, [currentSourceTimeMs, frameColorRangeSettings, performanceEffectConfig, project]);
   useEffect(() => { scoreMaskLayerRef.current?.setBlackMix(maskBlackMixPercent / 100); }, [maskBlackMixPercent]);
   useEffect(() => { scoreMaskLayerRef.current?.setPaperTransparency(paperTransparencyPercent / 100); }, [paperTransparencyPercent]);
 

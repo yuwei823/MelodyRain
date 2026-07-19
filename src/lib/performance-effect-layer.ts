@@ -16,6 +16,7 @@ export interface PerformanceEffectConfig {
   mode: PerformanceEffectMode;
   mixColor: string;
   mixAmount: number;
+  palette?: Readonly<Record<PitchStep, string>>;
 }
 
 export interface PerformancePitchTarget {
@@ -203,6 +204,7 @@ export class PerformanceEffectLayer {
 
   setConfig(config: PerformanceEffectConfig): void {
     const changedMode = config.mode !== this.config.mode;
+    const changedPalette = JSON.stringify(config.palette) !== JSON.stringify(this.config.palette);
     this.config = { ...config, mixAmount: clampUnit(config.mixAmount) };
     this.tintRect.setAttribute("fill", this.config.mixColor);
     this.tintRect.setAttribute("opacity", String(this.config.mixAmount));
@@ -214,6 +216,9 @@ export class PerformanceEffectLayer {
       this.applyMode();
     }
     else if (this.config.mode === "mask") this.update();
+    else if (changedPalette && this.rainbowReady) {
+      this.paints.forEach(({ element, paint }) => this.applyRainbowPaint(element, paint));
+    }
   }
 
   update(): void {
@@ -324,11 +329,23 @@ export class PerformanceEffectLayer {
   }
 
   private applyRainbowPaint(element: SVGGraphicsElement, paint: PerformancePaint): void {
-    const value = paint.kind === "solid" ? paint.color : this.gradientValue(element, paint.stops);
+    const recolor = (color: string) => {
+      const entry = (Object.entries(PERFORMANCE_RAINBOW_PALETTE) as Array<[PitchStep, string]>)
+        .find(([, paletteColor]) => paletteColor.toUpperCase() === color.toUpperCase());
+      return entry && this.config.palette ? this.config.palette[entry[0]] : color;
+    };
+    const resolvedPaint = paint.kind === "solid"
+      ? { kind: "solid" as const, color: recolor(paint.color) }
+      : { kind: "gradient" as const, stops: paint.stops.map((stop) => ({ ...stop, color: recolor(stop.color) })) };
+    const value = resolvedPaint.kind === "solid"
+      ? resolvedPaint.color
+      : this.gradientValue(element, resolvedPaint.stops);
     paintedLeaves(element).forEach((leaf) => {
       this.rememberPaint(leaf);
       const style = getComputedStyle(leaf);
-      leaf.style.setProperty("color", paint.kind === "solid" ? paint.color : PERFORMANCE_RAINBOW_PALETTE.G, "important");
+      leaf.style.setProperty("color", resolvedPaint.kind === "solid"
+        ? resolvedPaint.color
+        : this.config.palette?.G ?? PERFORMANCE_RAINBOW_PALETTE.G, "important");
       if (hasVisiblePaint(style.fill, style.fillOpacity)) leaf.style.setProperty("fill", value, "important");
       if (hasVisiblePaint(style.stroke, style.strokeOpacity)) leaf.style.setProperty("stroke", value, "important");
     });

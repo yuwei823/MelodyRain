@@ -40,6 +40,94 @@ select:focus-visible {
   outline-offset: 2px;
 }
 
+.ui-button {
+  --button-border: rgba(108, 204, 255, 0.24);
+  --button-background: rgba(41, 74, 103, 0.55);
+  --button-color: #dcecff;
+  --button-hover-border: rgba(108, 204, 255, 0.62);
+  --button-hover-background: rgba(52, 97, 132, 0.72);
+  min-height: 34px;
+  padding: 8px 11px;
+  border: 1px solid var(--button-border);
+  border-radius: 8px;
+  background: var(--button-background);
+  color: var(--button-color);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+
+  &:hover:not(:disabled) {
+    border-color: var(--button-hover-border);
+    background: var(--button-hover-background);
+    color: #fff;
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.38;
+  }
+
+  &--primary {
+    --button-background: linear-gradient(120deg, rgba(64, 164, 211, 0.34), rgba(122, 91, 196, 0.35));
+    --button-hover-background: linear-gradient(120deg, rgba(64, 164, 211, 0.48), rgba(122, 91, 196, 0.5));
+    font-weight: 750;
+  }
+
+  &--secondary {
+    --button-background: rgba(41, 74, 103, 0.55);
+  }
+
+  &--ghost {
+    --button-border: var(--control-border);
+    --button-background: var(--control-bg);
+    --button-color: #a9bed3;
+    --button-hover-background: rgba(83, 128, 164, 0.2);
+  }
+
+  &--danger {
+    --button-border: rgba(255, 94, 133, 0.3);
+    --button-background: rgba(119, 38, 62, 0.26);
+    --button-color: #ffb3c6;
+    --button-hover-border: rgba(255, 94, 133, 0.62);
+    --button-hover-background: rgba(148, 43, 73, 0.42);
+  }
+
+  &--compact {
+    min-height: 28px;
+    padding: 5px 8px;
+    font-size: 10px;
+    font-weight: 550;
+  }
+
+  &--round {
+    display: inline-grid;
+    place-items: center;
+    padding: 0;
+    border-radius: 50%;
+  }
+
+  &--segment {
+    --button-border: transparent;
+    --button-background: transparent;
+    --button-color: var(--muted);
+    min-height: 30px;
+    padding: 7px 8px;
+    border-width: 0;
+    font-weight: 550;
+
+    &[aria-pressed="true"] {
+      --button-background: var(--selected-bg);
+      --button-color: #fff;
+    }
+  }
+}
+
 .app-shell {
   width: min(1480px, 100%);
   margin: 0 auto;
@@ -292,6 +380,76 @@ select:focus-visible {
       color-mix(in srgb, var(--performance-color) 10%, transparent);
   }
 }
+.frame-color-range-list {
+  display: grid;
+  gap: 8px;
+}
+.frame-color-range-control {
+  padding-top: 11px;
+  border-top: 1px solid rgba(151, 190, 224, 0.12);
+}
+.frame-color-range-divider {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #a9bed3;
+  font-size: 10px;
+
+  span {
+    color: #6f859c;
+    font-size: 9px;
+  }
+}
+.frame-color-range-item {
+  display: grid;
+  gap: 8px;
+  padding: 9px;
+  border: 1px solid var(--control-border);
+  border-radius: 9px;
+  background: rgba(8, 17, 30, 0.35);
+}
+.frame-color-range-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #cbd9e9;
+  font-size: 10px;
+  button {
+    flex: 0 0 auto;
+  }
+}
+
+.export-button.ui-button--danger {
+  border-color: var(--button-border);
+  background: var(--button-background);
+  color: var(--button-color);
+
+  &:hover:not(:disabled) {
+    border-color: var(--button-hover-border);
+    background: var(--button-hover-background);
+  }
+}
+.frame-color-range-inputs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  label {
+    display: grid;
+    gap: 4px;
+    color: #8da2b8;
+    font-size: 9px;
+  }
+  input {
+    width: 100%;
+    padding: 7px 8px;
+    border: 1px solid var(--control-border);
+    border-radius: 7px;
+    background: var(--control-bg);
+    color: #dcecff;
+  }
+}
 .title-control {
   gap: 6px;
 }
@@ -385,13 +543,15 @@ select:focus-visible {
 .folder-select-button {
   width: 100%;
   overflow: hidden;
-  padding: 9px 10px;
+  min-height: 38px;
+  padding: 8px 10px;
   border: 1px dashed rgba(154, 191, 224, 0.3);
   border-radius: 9px;
   background: rgba(0, 0, 0, 0.12);
   color: #c8ddf1;
   cursor: pointer;
-  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1015,6 +1175,7 @@ select:focus-visible {
   white-space: nowrap;
 }
 .speed-group button {
+  width: 48px;
   border: 0;
   border-radius: 7px;
   padding: 7px 8px;

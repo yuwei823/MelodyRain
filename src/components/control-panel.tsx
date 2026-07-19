@@ -1,12 +1,10 @@
-import type { ChangeEvent, CSSProperties, RefObject } from "react";
+import type { ChangeEvent, RefObject } from "react";
 import { assetRelativePath } from "../lib/asset-folder";
-import {
-  PERFORMANCE_RAINBOW_PALETTE,
-  type PerformanceEffectMode,
-} from "../lib/performance-effect-layer";
 import type { LoadedProject } from "../hooks/use-project-loader";
 import type { BackgroundMode, ConnectedNoteMode } from "../lib/project-settings";
 import type { TitleColorMode } from "../lib/title-color";
+import type { FrameColorRange } from "../lib/frame-color-ranges";
+import { FrameColorRangeControl } from "./frame-color-range-control";
 
 interface ControlPanelProps {
   project: LoadedProject | null;
@@ -40,14 +38,15 @@ interface ControlPanelProps {
   onMaskBlackMixPercentChange(value: number): void;
   paperTransparencyPercent: number;
   onPaperTransparencyPercentChange(value: number): void;
-  performanceEffectMode: PerformanceEffectMode;
-  onPerformanceEffectModeChange(value: PerformanceEffectMode): void;
-  performanceMixColor: string;
-  onPerformanceMixColorChange(value: string): void;
   performanceMixPercent: number;
   onPerformanceMixPercentChange(value: number): void;
   connectedNoteMode: ConnectedNoteMode;
   onConnectedNoteModeChange(value: ConnectedNoteMode): void;
+  frameColorTransitionFrames: number;
+  performanceColorRanges: FrameColorRange[];
+  totalFrames: number;
+  onFrameColorTransitionFramesChange(value: number): void;
+  onPerformanceColorRangesChange(value: FrameColorRange[]): void;
 }
 
 export function ControlPanel({
@@ -82,14 +81,15 @@ export function ControlPanel({
   onMaskBlackMixPercentChange,
   paperTransparencyPercent,
   onPaperTransparencyPercentChange,
-  performanceEffectMode,
-  onPerformanceEffectModeChange,
-  performanceMixColor,
-  onPerformanceMixColorChange,
   performanceMixPercent,
   onPerformanceMixPercentChange,
   connectedNoteMode,
   onConnectedNoteModeChange,
+  frameColorTransitionFrames,
+  performanceColorRanges,
+  totalFrames,
+  onFrameColorTransitionFramesChange,
+  onPerformanceColorRangesChange,
 }: ControlPanelProps) {
   return (
     <aside className="app-panel control-panel">
@@ -97,7 +97,7 @@ export function ControlPanel({
         <div>
           <p className="step-label">SOURCE FOLDER / 素材文件夹</p>
         </div>
-        <button className="folder-select-button" type="button" onClick={onChooseFolder}>
+        <button className="ui-button ui-button--secondary folder-select-button" type="button" onClick={onChooseFolder}>
           {folderName ? `${folderName}` : "Choose media folder / 选择素材文件夹"}
         </button>
         <input
@@ -127,8 +127,8 @@ export function ControlPanel({
           </div>
         )}
         <div className="parameter-file-actions">
-          <button type="button" onClick={onSaveParameters} disabled={!project}>Save settings / 保存参数</button>
-          <button type="button" onClick={onReadParameters}>Load settings / 读取参数</button>
+          <button className="ui-button ui-button--secondary" type="button" onClick={onSaveParameters} disabled={!project}>Save settings / 保存参数</button>
+          <button className="ui-button ui-button--secondary" type="button" onClick={onReadParameters}>Load settings / 读取参数</button>
         </div>
         <small className="parameter-file-status">
           {settingsFile ? `Found / 已发现：${settingsFile.name}` : "Settings file / 参数文件：melody-rain.settings.json"}
@@ -154,6 +154,7 @@ export function ControlPanel({
           />
           <output>{titleColor.toUpperCase()}</output>
           <button
+            className="ui-button ui-button--ghost"
             type="button"
             aria-pressed={titleColorMode === "auto"}
             onClick={onUseAutoTitleColor}
@@ -172,6 +173,7 @@ export function ControlPanel({
         <div className="segmented-control segmented-control--three layout-options" aria-label="Measures per system / 每行小节数">
           {[1, 2, 3].map((value) => (
             <button
+              className="ui-button ui-button--segment"
               type="button"
               aria-pressed={measuresPerSystem === value}
               key={value}
@@ -189,6 +191,7 @@ export function ControlPanel({
         </div>
         <div className="segmented-control" aria-label="Mask background mode / 蒙版背景模式">
           <button
+            className="ui-button ui-button--segment"
             type="button"
             aria-pressed={backgroundMode === "image"}
             disabled={!project?.backgrounds.length}
@@ -197,6 +200,7 @@ export function ControlPanel({
             Image / 图片
           </button>
           <button
+            className="ui-button ui-button--segment"
             type="button"
             aria-pressed={backgroundMode === "color"}
             onClick={() => onBackgroundModeChange("color")}
@@ -260,63 +264,23 @@ export function ControlPanel({
 
       <div className="ui-card ui-stack performance-effect-control">
         <div>
-          <p className="step-label">NOTE EFFECT / 音符着色</p>
+          <p className="step-label">NOTE FRAME EFFECT / 音符帧效果</p>
         </div>
-        <div className="segmented-control" aria-label="Note coloring / 音符着色">
-          <button
-            type="button"
-            aria-pressed={performanceEffectMode === "mask"}
-            onClick={() => onPerformanceEffectModeChange("mask")}
-          >
-            Shared mask / 共用蒙版
-          </button>
-          <button
-            type="button"
-            aria-pressed={performanceEffectMode === "rainbow"}
-            onClick={() => onPerformanceEffectModeChange("rainbow")}
-          >
-            Rainbow / 彩虹色
-          </button>
-        </div>
-        {performanceEffectMode === "mask" ? (
-          <>
-            <label className="form-row form-row--color color-control">
-              <span>Mix color / 混入颜色</span>
-              <input
-                type="color"
-                value={performanceMixColor}
-                onChange={(event) => onPerformanceMixColorChange(event.target.value)}
-                aria-label="Performance element mix color / 演奏元素混入颜色"
-              />
-              <output>{performanceMixColor.toUpperCase()}</output>
-            </label>
-            <label className="form-row form-row--range performance-mix-control">
-              <span>Mix strength / 混入强度</span>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                step="1"
-                value={performanceMixPercent}
-                onChange={(event) => onPerformanceMixPercentChange(Number(event.target.value))}
-                aria-label="Performance element mix strength / 演奏元素混入强度"
-              />
-              <output>{performanceMixPercent}%</output>
-            </label>
-            <small>Uses the same background source and fixed crop as the score, with the selected color overlaid separately. / 与谱面共用同一背景源和固定裁切位置，仅单独叠加所选颜色。</small>
-          </>
-        ) : (
-          <>
-            <div className="performance-palette" aria-label="C D E F G A B rainbow palette / 彩虹配色">
-              {Object.entries(PERFORMANCE_RAINBOW_PALETTE).map(([step, color]) => (
-                <span key={step} style={{ "--performance-color": color } as CSSProperties}>
-                  {step}
-                </span>
-              ))}
-            </div>
-            <small>Noteheads use written pitch colors; chord stems use the far note, while beams and unpitched elements use gradients. / 音头按书写音名着色；和弦符杆取远端音，连梁与无音高元素使用渐变。</small>
-          </>
-        )}
+        <label className="form-row form-row--range performance-mix-control">
+          <span>Mix strength / 混入强度</span>
+          <input type="range" min="0" max="100" step="1" value={performanceMixPercent}
+            onChange={(event) => onPerformanceMixPercentChange(Number(event.target.value))}
+            aria-label="Shared note color mix strength / 共享音符着色混入强度" />
+          <output>{performanceMixPercent}%</output>
+        </label>
+        <small>Shared by solid-color ranges; rainbow ranges always use full color. / 所有单色范围共用；彩虹色始终使用完整色彩。</small>
+        <FrameColorRangeControl
+          totalFrames={totalFrames}
+          transitionFrames={frameColorTransitionFrames}
+          ranges={performanceColorRanges}
+          onTransitionFramesChange={onFrameColorTransitionFramesChange}
+          onChange={onPerformanceColorRangesChange}
+        />
       </div>
 
       <div className="ui-card ui-stack performance-effect-control connected-notes-control">
@@ -324,9 +288,9 @@ export function ControlPanel({
           <p className="step-label">CONNECTED NOTES / 共享连杆音符</p>
         </div>
         <div className="segmented-control" aria-label="Connected note mode / 共享连杆音符模式">
-          <button type="button" aria-pressed={connectedNoteMode === "together"}
+          <button className="ui-button ui-button--segment" type="button" aria-pressed={connectedNoteMode === "together"}
             onClick={() => onConnectedNoteModeChange("together")}>Fall together / 一并落下</button>
-          <button type="button" aria-pressed={connectedNoteMode === "expand"}
+          <button className="ui-button ui-button--segment" type="button" aria-pressed={connectedNoteMode === "expand"}
             onClick={() => onConnectedNoteModeChange("expand")}>Expand after falling / 落下后展开</button>
         </div>
         <small>Only affects eighth notes, sixteenth notes, and shorter notes sharing a beam. / 仅影响共享符尾连杆的八分、十六分及更短音符。</small>

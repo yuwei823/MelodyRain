@@ -109,8 +109,16 @@ The **保存参数** (Save Settings) action stores:
 - Background mode, color, or image filename;
 - Score-mask black mixing and paper transparency;
 - Performance-effect mode, mix color, and mix strength.
+- Connected-note mode;
+- Frame-range coloring with a default 15-frame transition and custom ranges.
+
+**NOTE FRAME EFFECT / 音符帧效果** manages one shared mix strength and frame-range coloring. On first load it creates `Range 1` from frame 1 through the final frame. Solid ranges use the shared score background source with a color overlay at the selected strength; rainbow ranges ignore strength. When a range ends or ranges have a gap, the most recent range setting continues until another range takes over or the video ends. Same-mode color boundaries interpolate from absolute frame numbers, while solid/rainbow boundaries switch renderers directly.
 
 The filename is always `melody-rain.settings.json`. If the browser has write access to the asset folder, the file is saved there directly. Otherwise, the browser downloads it and you must move it into the asset folder manually. Use **读取参数** (Load Settings) to reapply the detected settings file or choose another JSON file.
+
+The current development format is v5 and only the current version is accepted. `sample/ode-to-joy/melody-rain.settings.json` is the complete editable default and contains readable `noteFrameEffect` strength, transition, and at least one range starting at frame 1.
+
+On first startup, when no user media folder has been remembered, MelodyRain automatically loads `sample/ode-to-joy`, including its score, MIDI, MP3, background, and default settings. Once the user selects and authorizes a media folder, later refreshes restore that folder instead of replacing it with the sample.
 
 ## Production Build
 

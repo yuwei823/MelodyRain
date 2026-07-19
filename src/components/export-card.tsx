@@ -126,7 +126,8 @@ export function ExportCard({
         <small>
           {formatDuration(startFrame * 1_000 / profile.fps)}–{formatDuration(endFrame * 1_000 / profile.fps)}
         </small>
-        <button type="button" onClick={() => { setStartFrame(0); setEndFrame(totalFrames); }}>
+        <button className="ui-button ui-button--ghost ui-button--compact" type="button"
+          onClick={() => { setStartFrame(0); setEndFrame(totalFrames); }}>
           Full range / 完整范围
         </button>
       </fieldset>
@@ -150,7 +151,7 @@ export function ExportCard({
       )}
       {error && <small className="export-error">{error}</small>}
       <button
-        className="export-button"
+        className={`ui-button ${active ? "ui-button--danger" : "ui-button--primary"} export-button`}
         type="button"
         disabled={!active && (!projectLabel || !fileName.trim() || !validRange)}
         onClick={() => active ? onCancel() : onStart(fileName.trim(), quality, frameRange)}

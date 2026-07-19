@@ -61,8 +61,8 @@ export function PlaybackPanel({
           <span>{stateLabel}</span>
         </div>
         <div className="playback-buttons">
-          <button className="round-button" type="button" onClick={onRewind} aria-label="Rewind / 回到开头">↺</button>
-          <button className="play-button" type="button" onClick={onTogglePlayback}>
+          <button className="ui-button ui-button--round round-button" type="button" onClick={onRewind} aria-label="Rewind / 回到开头">↺</button>
+          <button className="ui-button ui-button--primary play-button" type="button" onClick={onTogglePlayback}>
             {snapshot.state === "playing" ? "Pause / 暂停" : "Play / 播放"}
           </button>
         </div>
@@ -87,7 +87,7 @@ export function PlaybackPanel({
           {[0.9, 0.95, 1].map((speed) => (
             <button
               type="button"
-              className={snapshot.tempoScale === speed ? "is-active" : ""}
+              className={`ui-button ui-button--ghost ui-button--compact ${snapshot.tempoScale === speed ? "is-active" : ""}`}
               key={speed}
               onClick={() => onTempoScaleChange(speed)}
             >

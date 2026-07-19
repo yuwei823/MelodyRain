@@ -1207,7 +1207,7 @@ MVP 至少维护以下自有或可合法再分发的固定测试谱：
 - OSMD SVG 排版、单一竖屏 RenderProfile、每行小节数控制；
 - 单一 Transport 驱动播放、跳转、变速、谱面相机和动画；
 - `rainDrop`、记谱元素时序、蒙版/彩虹效果与项目设置；
-- 设置版本迁移、错误提示、核心单元/集成测试和真实 MusicXML 的 OSMD 兼容回归。
+- 当前设置格式校验、错误提示、核心单元/集成测试和真实 MusicXML 的 OSMD 兼容回归。
 
 退出条件：样例和固定测试谱可反复载入、播放、跳转和切换设置；项目切换无状态串扰；不存在已知高风险文件解析问题。
 
@@ -1297,11 +1297,13 @@ MVP 至少维护以下自有或可合法再分发的固定测试谱：
 
 ### 15.2 设置文件契约
 
-设置文件名固定为 `melody-rain.settings.json`，当前格式版本为 `3`。保存操作总是输出当前版本；读取时先迁移再校验。
+设置文件名固定为 `melody-rain.settings.json`，当前开发格式版本为 `5`。保存与读取只接受当前版本；项目尚未发布，因此不维护旧版设置迁移。`noteFrameEffect` 集中保存共享混入强度、过渡帧数和帧范围。单色范围复用原始 `performanceMask` 语义；彩虹范围不使用混入强度。范围结束或范围之间存在空档时，最近一个范围持续生效，直到下一范围接管或视频结束。`sample/ode-to-joy/melody-rain.settings.json` 是默认配置参考。
+
+普通预览页面初始化顺序固定为：URL 中的导出任务、浏览器已记住且仍有读取权限的用户素材文件夹、内置 `sample/ode-to-joy`。没有记住的文件夹时，客户端通过 `/api/demo/manifest` 获取示例素材清单并加载乐谱、MIDI、MP3、背景图片与 v5 设置文件。示例只作为首次可读默认状态，不写入目录记忆，也不得覆盖用户已经选择的文件夹。
 
 | 字段 | v2 类型/范围 | 说明 |
 |---|---|---|
-| `version` | `3` | 当前格式版本 |
+| `version` | `5` | 当前格式版本 |
 | `title` | string | 自定义标题，允许空字符串 |
 | `titleColor` | `#RRGGBB` | 标题颜色 |
 | `titleColorMode` | `auto` / `custom` | 自动对比色或自定义颜色 |
@@ -1311,12 +1313,12 @@ MVP 至少维护以下自有或可合法再分发的固定测试谱：
 | `backgroundImageFile` | string / null | 背景图片文件名 |
 | `maskBlackMixPercent` | 0–100 | 静态谱面蒙版黑色混入 |
 | `paperTransparencyPercent` | 0–100 | 谱纸透明度 |
-| `performanceEffectMode` | `mask` / `rainbow` | 演奏元素效果 |
-| `performanceMixColor` | `#RRGGBB` | 演奏蒙版混色 |
-| `performanceMixPercent` | 0–100 | 演奏蒙版混色比例 |
 | `connectedNoteMode` | `together` / `expand` | 共享连杆音符一并落下或落下后展开 |
+| `noteFrameEffect.mixStrengthPercent` | 0–100 | 所有单色范围共享的混入强度 |
+| `noteFrameEffect.transitionFrames` | integer, 0–100 | 同模式范围边界过渡帧数，默认 `15` |
+| `noteFrameEffect.ranges` | array | 不重叠的半开帧区间及其 `solid` / `rainbow` 着色配置 |
 
-v1 → v2 迁移新增 `titleColor` 与 `titleColorMode`。旧文件缺少字段时分别使用 `#25364A` 和 `auto`；若旧文件已经包含合法值则保留。v2 → v3 新增 `connectedNoteMode`，旧文件默认迁移为 `together`。缺少有效版本号、低于 v1、或高于当前版本的文件拒绝读取。百分数字段读取时取整并钳制至 0–100，随后继续执行字段范围校验。
+UI 使用从 1 开始且包含结束帧的帧号；设置内部使用从 0 开始的半开区间 `[startFrame, endFrame)`。缺少有效版本号或版本号不等于 `5` 的文件拒绝读取。开发阶段如需调整结构，直接升级当前格式和样例文件，不增加迁移链。
 
 ### 15.3 尚未实现的目标态能力
 
@@ -1330,7 +1332,7 @@ v1 → v2 迁移新增 `titleColor` 与 `titleColorMode`。旧文件缺少字段
 ### 15.4 当前验证基线
 
 - TypeScript 启用 `strict`、`noUncheckedIndexedAccess`、`noUnusedLocals` 与 `noUnusedParameters`。
-- 自动化测试覆盖素材匹配、MXL/MIDI 解析、设置迁移、Transport、相机、布局目标、谱面净化、雨滴、时间层、蒙版和演奏效果核心逻辑。
+- 自动化测试覆盖素材匹配、MXL/MIDI 解析、当前设置格式校验、Transport、相机、布局目标、谱面净化、雨滴、时间层、蒙版和演奏效果核心逻辑。
 - 截至本章日期，仓库测试基线为 16 个测试文件、63 项测试；类型检查和生产构建应作为每次发布的最低门禁。
 
 ### 15.5 当前前端职责边界

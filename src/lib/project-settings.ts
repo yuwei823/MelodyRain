@@ -1,10 +1,16 @@
-import type { PerformanceEffectMode } from "./performance-effect-layer";
 import { DARK_TITLE_COLOR, type TitleColorMode } from "./title-color";
+import type { FrameColorRange } from "./frame-color-ranges";
 
 export const PROJECT_SETTINGS_FILE_NAME = "melody-rain.settings.json";
-export const PROJECT_SETTINGS_VERSION = 3 as const;
+export const PROJECT_SETTINGS_VERSION = 5 as const;
 export type BackgroundMode = "image" | "color";
 export type ConnectedNoteMode = "together" | "expand";
+
+export interface NoteFrameEffectSettings {
+  mixStrengthPercent: number;
+  transitionFrames: number;
+  ranges: FrameColorRange[];
+}
 
 export interface ProjectSettings {
   version: typeof PROJECT_SETTINGS_VERSION;
@@ -17,28 +23,31 @@ export interface ProjectSettings {
   backgroundImageFile: string | null;
   maskBlackMixPercent: number;
   paperTransparencyPercent: number;
-  performanceEffectMode: PerformanceEffectMode;
-  performanceMixColor: string;
-  performanceMixPercent: number;
   connectedNoteMode: ConnectedNoteMode;
+  noteFrameEffect: NoteFrameEffectSettings;
 }
 
 type SettingsRecord = Record<string, unknown>;
-type SettingsMigration = (settings: SettingsRecord) => SettingsRecord;
 
-const SETTINGS_MIGRATIONS: Record<number, SettingsMigration> = {
-  1: (settings) => ({
-    ...settings,
-    version: 2,
-    titleColor: settings.titleColor ?? DARK_TITLE_COLOR,
-    titleColorMode: settings.titleColorMode ?? "auto",
-  }),
-  2: (settings) => ({
-    ...settings,
-    version: 3,
-    connectedNoteMode: settings.connectedNoteMode ?? "together",
-  }),
-};
+function frameColorRanges(value: unknown): FrameColorRange[] {
+  if (!Array.isArray(value)) throw new Error("noteFrameEffect.ranges must be an array / 帧着色范围必须是数组");
+  const ranges = value.map((entry, index) => {
+    const range = record(entry);
+    if (typeof range.id !== "string" || !range.id) throw new Error(`noteFrameEffect.ranges[${index}].id is invalid`);
+    if (!Number.isInteger(range.startFrame) || !Number.isInteger(range.endFrame)
+      || (range.startFrame as number) < 0 || (range.endFrame as number) <= (range.startFrame as number)) {
+      throw new Error(`noteFrameEffect.ranges[${index}] has an invalid frame range / 帧范围无效`);
+    }
+    if (range.mode !== "solid" && range.mode !== "rainbow") throw new Error(`noteFrameEffect.ranges[${index}].mode is invalid`);
+    return { id: range.id, startFrame: range.startFrame as number, endFrame: range.endFrame as number,
+      mode: range.mode as FrameColorRange["mode"], color: color(range.color, `noteFrameEffect.ranges[${index}].color`) };
+  });
+  const ordered = [...ranges].sort((left, right) => left.startFrame - right.startFrame);
+  if (ordered.some((range, index) => index > 0 && ordered[index - 1]!.endFrame > range.startFrame)) {
+    throw new Error("noteFrameEffect.ranges must not overlap / 帧着色范围不能重叠");
+  }
+  return ranges;
+}
 
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -47,24 +56,14 @@ function record(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function migrateProjectSettings(settings: SettingsRecord): SettingsRecord {
+function currentProjectSettings(settings: SettingsRecord): SettingsRecord {
   if (!Number.isInteger(settings.version)) {
     throw new Error("Settings file has no valid version / 参数文件缺少有效的版本号");
   }
-
-  const sourceVersion = settings.version as number;
-  if (sourceVersion > PROJECT_SETTINGS_VERSION || sourceVersion < 1) {
-    throw new Error(`Unsupported settings version / 不支持的参数文件版本：${sourceVersion}`);
+  if (settings.version !== PROJECT_SETTINGS_VERSION) {
+    throw new Error(`Unsupported settings version / 不支持的参数文件版本：${settings.version}`);
   }
-
-  let migrated = { ...settings };
-  while (migrated.version !== PROJECT_SETTINGS_VERSION) {
-    const version = migrated.version as number;
-    const migration = SETTINGS_MIGRATIONS[version];
-    if (!migration) throw new Error(`Unable to migrate settings version / 无法迁移参数文件版本：${version}`);
-    migrated = migration(migrated);
-  }
-  return migrated;
+  return settings;
 }
 
 function percent(value: unknown, field: string): number {
@@ -86,13 +85,11 @@ export function parseProjectSettings(text: string): ProjectSettings {
   } catch {
     throw new Error("Settings file is not valid JSON / 参数文件不是有效的 JSON");
   }
-  const value = migrateProjectSettings(record(parsed));
+  const value = currentProjectSettings(record(parsed));
+  const noteFrameEffect = record(value.noteFrameEffect);
   if (typeof value.title !== "string") throw new Error("title must be a string / 必须是字符串");
   if (value.backgroundMode !== "image" && value.backgroundMode !== "color") {
     throw new Error("Invalid backgroundMode / backgroundMode 无效");
-  }
-  if (value.performanceEffectMode !== "mask" && value.performanceEffectMode !== "rainbow") {
-    throw new Error("Invalid performanceEffectMode / performanceEffectMode 无效");
   }
   if (value.connectedNoteMode !== "together" && value.connectedNoteMode !== "expand") {
     throw new Error("Invalid connectedNoteMode / connectedNoteMode 无效");
@@ -116,10 +113,12 @@ export function parseProjectSettings(text: string): ProjectSettings {
     backgroundImageFile: value.backgroundImageFile,
     maskBlackMixPercent: percent(value.maskBlackMixPercent, "maskBlackMixPercent"),
     paperTransparencyPercent: percent(value.paperTransparencyPercent, "paperTransparencyPercent"),
-    performanceEffectMode: value.performanceEffectMode,
-    performanceMixColor: color(value.performanceMixColor, "performanceMixColor"),
-    performanceMixPercent: percent(value.performanceMixPercent, "performanceMixPercent"),
     connectedNoteMode: value.connectedNoteMode,
+    noteFrameEffect: {
+      mixStrengthPercent: percent(noteFrameEffect.mixStrengthPercent, "noteFrameEffect.mixStrengthPercent"),
+      transitionFrames: percent(noteFrameEffect.transitionFrames, "noteFrameEffect.transitionFrames"),
+      ranges: frameColorRanges(noteFrameEffect.ranges),
+    },
   };
 }
 

@@ -54,6 +54,7 @@ export function useProjectLoader({ onProjectLoaded, onSettingsLoaded }: UseProje
   const folderInputRef = useRef<HTMLInputElement>(null);
   const directoryHandleRef = useRef<RememberedDirectoryHandle | null>(null);
   const loadRequestRef = useRef(0);
+  const initialLoadStartedRef = useRef(false);
   const remembersFolders = canRememberFolder();
 
   const adoptProject = useCallback((nextProject: LoadedProject) => {
@@ -163,26 +164,60 @@ export function useProjectLoader({ onProjectLoaded, onSettingsLoaded }: UseProje
     }
   }, [selectAssetFolderFromFiles]);
 
-  const loadRememberedFolder = useCallback(async () => {
+  const loadBundledSample = useCallback(async () => {
+    setStatus("Loading sample project… / 正在加载示例项目…");
+    setError(null);
     try {
-      const handle = await lastRememberedAssetFolder();
-      if (!handle) return;
-      setFolderName(handle.name);
-      if (!await canReadFolder(handle)) {
-        setStatus(`Remembered “${handle.name}”; select it again to grant access. / 已记住“${handle.name}”，请重新选择以授权读取。`);
-        return;
-      }
-      directoryHandleRef.current = handle;
-      setStatus(`Reloading “${handle.name}”… / 正在重新读取“${handle.name}”…`);
-      selectAssetFolderFromFiles(await filesInFolder(handle));
+      const response = await fetch("/api/demo/manifest");
+      if (!response.ok) throw new Error(`Sample project unavailable (${response.status}) / 示例项目不可用`);
+      const manifest = await response.json() as {
+        folderName: string;
+        assets: Array<{ key: string; name: string; url: string }>;
+      };
+      const files = await Promise.all(manifest.assets.map(async (asset) => {
+        const assetResponse = await fetch(asset.url);
+        if (!assetResponse.ok) throw new Error(`Unable to load ${asset.name} / 无法加载示例素材`);
+        return new File([await assetResponse.blob()], asset.name, {
+          type: assetResponse.headers.get("content-type") ?? "application/octet-stream",
+        });
+      }));
+      directoryHandleRef.current = null;
+      setFolderName(manifest.folderName);
+      selectAssetFolderFromFiles(files);
     } catch (caught) {
+      setStatus("Sample project failed / 示例项目加载失败");
       setError(caught instanceof Error ? caught.message : String(caught));
     }
   }, [selectAssetFolderFromFiles]);
 
+  const loadRememberedFolder = useCallback(async (): Promise<boolean> => {
+    try {
+      const handle = await lastRememberedAssetFolder();
+      if (!handle) return false;
+      setFolderName(handle.name);
+      if (!await canReadFolder(handle)) {
+        setStatus(`Remembered “${handle.name}”; select it again to grant access. / 已记住“${handle.name}”，请重新选择以授权读取。`);
+        return true;
+      }
+      directoryHandleRef.current = handle;
+      setStatus(`Reloading “${handle.name}”… / 正在重新读取“${handle.name}”…`);
+      selectAssetFolderFromFiles(await filesInFolder(handle));
+      return true;
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+      return false;
+    }
+  }, [selectAssetFolderFromFiles]);
+
   useEffect(() => {
-    if (remembersFolders) void loadRememberedFolder();
-  }, [loadRememberedFolder, remembersFolders]);
+    if (initialLoadStartedRef.current) return;
+    initialLoadStartedRef.current = true;
+    if (new URLSearchParams(window.location.search).has("exportJob")) return;
+    void (async () => {
+      const restored = remembersFolders ? await loadRememberedFolder() : false;
+      if (!restored) await loadBundledSample();
+    })();
+  }, [loadBundledSample, loadRememberedFolder, remembersFolders]);
 
   const chooseAndLoadAssetFolder = useCallback(async () => {
     if (!remembersFolders) {

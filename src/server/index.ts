@@ -31,6 +31,8 @@ const demoAssets = {
   score: { file: "ode-to-joy-easy-variation.mxl", contentType: "application/vnd.recordare.musicxml" },
   midi: { file: "ode-to-joy-easy-variation.mid", contentType: "audio/midi" },
   audio: { file: "ode-to-joy-easy-variation.mp3", contentType: "audio/mpeg" },
+  background: { file: "background.jpeg", contentType: "image/jpeg" },
+  settings: { file: "melody-rain.settings.json", contentType: "application/json" },
 } as const;
 
 const app = express();
@@ -48,9 +50,12 @@ app.get("/api/health", (_request, response) => {
 app.get("/api/demo/manifest", (_request, response) => {
   response.json({
     title: "Ode to Joy (Easy variation)",
-    assets: Object.fromEntries(
-      Object.keys(demoAssets).map((key) => [key, `/api/demo/${key}`]),
-    ),
+    folderName: "sample/ode-to-joy",
+    assets: Object.entries(demoAssets).map(([key, asset]) => ({
+      key,
+      name: asset.file,
+      url: `/api/demo/${key}`,
+    })),
   });
 });
 
