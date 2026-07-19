@@ -10,10 +10,10 @@ The current version supports portrait-format previews in the browser and local M
 
 - Renders SVG sheet music with OpenSheetMusicDisplay;
 - Automatically matches MXL/MusicXML, MIDI, and MP3 files with the same base name in an asset folder;
-- Supports play, pause, rewind, seeking, and `0.75×`, `0.8×`, `0.85×`, `0.9×`, and `0.95×` playback speeds;
+- Supports play, pause, rewind, seeking, and `0.9×`, `0.95×`, and `1×` playback speeds;
 - Deterministically renders frames with local Chrome and exports `1080 × 1920`, 30 FPS H.264/AAC MP4 video through FFmpeg, with progress and cancellation;
 - Animates notes, chords, rests, and related notation as they fall, hit, and settle onto the score;
-- Scrolls the score vertically with the active system;
+- Uses a three-phase vertical camera: stationary until the performance reaches the screen midpoint, constant-speed scrolling, then a stationary end phase after the score reaches its maximum offset;
 - Uses a fixed image or solid color as the score mask source, with adjustable black mixing and paper transparency;
 - Offers shared-mask and C–B rainbow styles for performance elements;
 - Lets beamed note groups fall together or expand left to right after the first note lands;
@@ -21,12 +21,26 @@ The current version supports portrait-format previews in the browser and local M
 - Allows 1–6 measures per system;
 - Saves project parameters to `melody-rain.settings.json` and restores them when the asset folder is loaded again.
 
+## Video Export
+
+The local Express service creates an export job. Playwright drives an installed Chrome or Edge browser to render deterministic frames from absolute timeline times, then pipes PNG frames to FFmpeg and muxes them with the supplied MP3 as an H.264/AAC MP4. Preview and export share the same Transport, score camera, and animation-state calculations.
+
+- Fixed `1080 × 1920`, 9:16, 30 FPS MP4 output;
+- Full-score export with a 1.2-second falling-note pre-roll;
+- Progress, cancellation, and error reporting;
+- The current display title is the default filename, with Windows-invalid filename characters replaced automatically;
+- The result is written directly to the authorized asset folder when possible, with browser download as a fallback;
+- A completion dialog reports the filename and save method.
+
+Development exports require `npm run dev`, which starts both Vite and the local export service. Running only `npm run dev:web` leaves the export API unavailable.
+
 When no project settings file is loaded, the visual defaults are `40%` score-mask black mixing, `10%` paper transparency, and `50%` performance-mask color mixing.
 
 ## Requirements
 
 - Node.js `>=20.19 <27`
 - npm
+- FFmpeg available as `ffmpeg` on the system `PATH`
 - A recent version of Chrome or Edge is recommended. When the File System Access API is available, MelodyRain can remember the asset folder and write settings directly into it. Other browsers fall back to folder selection and JSON downloads.
 
 ## Quick Start
@@ -124,6 +138,7 @@ See [MelodyRain_Product_Technical_Spec_v0.1.md](./MelodyRain_Product_Technical_S
 ## Current Limitations
 
 - Video export requires a locally installed Chrome or Edge browser and FFmpeg available on `PATH`;
+- The current frame-by-frame browser screenshot pipeline is substantially slower than real time;
 - Audio is played directly from the supplied MP3; SoundFont/FluidSynth synthesis is not integrated;
 - MusicXML and MIDI are matched against the available score targets, but there is no formal alignment-confidence report or manual correction interface yet;
 - Only a 9:16 portrait stage is available; landscape layouts are not supported;
