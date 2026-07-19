@@ -8,7 +8,7 @@ describe("portrait render profile", () => {
       orientation: "portrait",
       width: 1080,
       height: 1920,
-      fps: 60,
+      fps: 30,
       scoreScale: 2 / 3,
       measuresPerSystem: 2,
     });

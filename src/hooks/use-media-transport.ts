@@ -47,10 +47,16 @@ export function useMediaTransport(project: LoadedProject | null, onFrame: (snaps
     };
   }, [project]);
 
-  const activeNotes = useMemo(() => {
-    const byId = new Map(project?.midi.events.map((event) => [event.id, event]) ?? []);
-    return snapshot.activeNoteIds.flatMap((id) => byId.get(id) ?? []);
-  }, [project, snapshot.activeNoteIds]);
+  // The id->event map only changes with the project, so it stays memoized
+  // across the 50ms UI refreshes; only the tiny id lookup list rebuilds.
+  const eventsById = useMemo(
+    () => new Map(project?.midi.events.map((event) => [event.id, event]) ?? []),
+    [project],
+  );
+  const activeNotes = useMemo(
+    () => snapshot.activeNoteIds.flatMap((id) => eventsById.get(id) ?? []),
+    [eventsById, snapshot.activeNoteIds],
+  );
   const currentSourceTimeMs = useCallback(() => transportRef.current?.snapshot().sourceTimeMs ?? -TRANSPORT_PRE_ROLL_MS - 1, []);
 
   return { snapshot, activeNotes, audioRef, currentSourceTimeMs,

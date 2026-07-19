@@ -43,14 +43,36 @@ function palette(mode: FrameColorMode, color: string): Palette {
   ])) as Palette;
 }
 
+// Callers (useScoreStage, resolveFrameColorConfig) hit this from the rAF hot
+// path, so keep the sorted order memoized per settings object instead of
+// re-sorting and reallocating on every frame.
+const sortedRangeIndex = new WeakMap<FrameColorRange[], FrameColorRange[]>();
+
+function sortedRanges(ranges: FrameColorRange[]): FrameColorRange[] {
+  let ordered = sortedRangeIndex.get(ranges);
+  if (!ordered) {
+    ordered = [...ranges].sort((left, right) => left.startFrame - right.startFrame);
+    sortedRangeIndex.set(ranges, ordered);
+  }
+  return ordered;
+}
+
 function styleAt(frame: number, globalConfig: PerformanceEffectConfig, ranges: FrameColorRange[]) {
-  const ordered = [...ranges].sort((left, right) => left.startFrame - right.startFrame);
+  const ordered = sortedRanges(ranges);
   const range = ordered.find((candidate) => frame >= candidate.startFrame && frame < candidate.endFrame)
-    ?? [...ordered].reverse().find((candidate) => candidate.startFrame <= frame)
+    ?? lastStartedAtOrBefore(ordered, frame)
     ?? ordered[0];
   return range
     ? { mode: range.mode, color: range.color }
     : { mode: globalConfig.mode === "rainbow" ? "rainbow" as const : "solid" as const, color: globalConfig.mixColor };
+}
+
+function lastStartedAtOrBefore(ordered: FrameColorRange[], frame: number): FrameColorRange | undefined {
+  for (let index = ordered.length - 1; index >= 0; index -= 1) {
+    const candidate = ordered[index]!;
+    if (candidate.startFrame <= frame) return candidate;
+  }
+  return undefined;
 }
 
 function sameStyle(left: ReturnType<typeof styleAt>, right: ReturnType<typeof styleAt>): boolean {
@@ -72,17 +94,21 @@ export function resolveFrameColorConfig(
   globalConfig: PerformanceEffectConfig,
   settings: FrameColorRangeSettings,
 ): PerformanceEffectConfig {
-  const current = styleAt(frame, globalConfig, settings.ranges);
-  const boundaries = settings.ranges.flatMap((range) => [range.startFrame, range.endFrame])
-    .filter((boundary) => boundary <= frame)
-    .sort((left, right) => right - left);
+  const ranges = settings.ranges;
+  const current = styleAt(frame, globalConfig, ranges);
+  const boundaries: number[] = [];
+  for (const range of ranges) {
+    if (range.startFrame <= frame) boundaries.push(range.startFrame);
+    if (range.endFrame <= frame) boundaries.push(range.endFrame);
+  }
+  boundaries.sort((left, right) => right - left);
   const boundary = boundaries.find((candidate) => candidate > 0
-    && !sameStyle(styleAt(candidate - 1, globalConfig, settings.ranges), styleAt(candidate, globalConfig, settings.ranges)));
+    && !sameStyle(styleAt(candidate - 1, globalConfig, ranges), styleAt(candidate, globalConfig, ranges)));
   const transitionFrames = Math.max(0, Math.floor(settings.transitionFrames));
   const progress = boundary === undefined || transitionFrames === 0
     ? 1
     : Math.min(1, (frame - boundary + 1) / transitionFrames);
-  const previous = boundary === undefined ? current : styleAt(boundary - 1, globalConfig, settings.ranges);
+  const previous = boundary === undefined ? current : styleAt(boundary - 1, globalConfig, ranges);
   if (previous.mode !== current.mode) {
     return current.mode === "solid"
       ? { mode: "mask", mixColor: current.color, mixAmount: globalConfig.mixAmount }

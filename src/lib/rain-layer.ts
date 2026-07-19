@@ -56,12 +56,12 @@ function easeInCubic(value: number): number {
   return value * value * value;
 }
 
-function findTarget(event: MidiNoteEvent, targets: ScoreTarget[], used: Set<string>): ScoreTarget | null {
+function findTarget(event: MidiNoteEvent, targetsByPitch: Map<number, ScoreTarget[]>, used: Set<string>): ScoreTarget | null {
   let best: ScoreTarget | null = null;
   let bestDistance = Number.POSITIVE_INFINITY;
 
-  for (const target of targets) {
-    if (used.has(target.id) || target.pitchMidi !== event.midi) continue;
+  for (const target of targetsByPitch.get(event.midi) ?? []) {
+    if (used.has(target.id)) continue;
     const distance = Math.abs(target.scoreQuarter - event.scoreQuarter);
     if (distance < bestDistance) {
       best = target;
@@ -75,9 +75,15 @@ function findTarget(event: MidiNoteEvent, targets: ScoreTarget[], used: Set<stri
 export function mapRainChords(events: MidiNoteEvent[], targets: ScoreTarget[]): RainChord[] {
   const used = new Set<string>();
   const groups = new Map<string, RainChord>();
+  const targetsByPitch = new Map<number, ScoreTarget[]>();
+  for (const target of targets) {
+    const bucket = targetsByPitch.get(target.pitchMidi);
+    if (bucket) bucket.push(target);
+    else targetsByPitch.set(target.pitchMidi, [target]);
+  }
 
   for (const event of events) {
-    const target = findTarget(event, targets, used);
+    const target = findTarget(event, targetsByPitch, used);
     if (!target) continue;
     used.add(target.id);
 

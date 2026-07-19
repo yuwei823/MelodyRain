@@ -7,6 +7,7 @@ import multer from "multer";
 import { readAppVersion } from "./app-version.js";
 import {
   cancelExportJob,
+  cleanupStaleExportJobs,
   createExportJob,
   exportJob,
   exportJobManifest,
@@ -26,6 +27,7 @@ const exportRoot = path.join(os.tmpdir(), "melody-rain-exports");
 const uploadRoot = path.join(exportRoot, "uploads");
 mkdirSync(uploadRoot, { recursive: true });
 const upload = multer({ dest: uploadRoot, limits: { fileSize: 100 * 1024 * 1024, files: 16 } });
+void cleanupStaleExportJobs(exportRoot);
 
 const demoAssets = {
   score: { file: "ode-to-joy-easy-variation.mxl", contentType: "application/vnd.recordare.musicxml" },

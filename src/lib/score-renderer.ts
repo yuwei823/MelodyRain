@@ -82,7 +82,7 @@ export class ScoreRenderer {
 
   constructor(private readonly container: HTMLElement) {}
 
-  async render(musicXml: string, measuresPerSystem = 4, _requestedScoreScale?: number): Promise<ScoreRenderResult> {
+  async render(musicXml: string, measuresPerSystem = 4): Promise<ScoreRenderResult> {
     const osmd = await this.ensureOsmd();
     const laidOutXml = applyMeasuresPerSystem(sanitizeScoreMusicXml(musicXml), measuresPerSystem);
     osmd.clear();

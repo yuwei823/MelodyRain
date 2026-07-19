@@ -7,15 +7,13 @@ interface StagePanelProps {
   scoreViewportRef: RefObject<HTMLDivElement | null>;
   scoreContentClipRef: RefObject<HTMLDivElement | null>;
   scoreHostRef: RefObject<HTMLDivElement | null>;
-  exportFrameRef: RefObject<HTMLDivElement | null>;
 }
 
-export function StagePanel({ title, titleColor, scoreViewportRef, scoreContentClipRef, scoreHostRef, exportFrameRef }: StagePanelProps) {
+export function StagePanel({ title, titleColor, scoreViewportRef, scoreContentClipRef, scoreHostRef }: StagePanelProps) {
   return (
     <section className="app-panel stage-panel">
       <div className="stage-preview-wrap">
         <div
-          ref={exportFrameRef}
           className="portrait-frame"
           style={{ aspectRatio: PORTRAIT_ASPECT_RATIO }}
           data-render-profile={PORTRAIT_RENDER_PROFILE.id}

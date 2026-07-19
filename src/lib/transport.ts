@@ -1,4 +1,4 @@
-import type { MidiTimeline } from "./midi";
+import type { MidiTimeline } from "./midi.js";
 
 export type TransportState = "idle" | "playing" | "paused" | "ended";
 

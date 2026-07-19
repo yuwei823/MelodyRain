@@ -22,7 +22,6 @@ function stateLabel(state: TransportSnapshot["state"]): string {
 
 export default function App() {
   const visual = useProjectVisualSettings();
-  const exportFrameRef = useRef<HTMLDivElement>(null);
   const frameColorRangeSettings = useMemo(() => ({
     transitionFrames: visual.frameColorTransitionFrames,
     ranges: visual.performanceColorRanges,
@@ -210,7 +209,6 @@ export default function App() {
           scoreViewportRef={scoreViewportRef}
           scoreContentClipRef={scoreContentClipRef}
           scoreHostRef={scoreHostRef}
-          exportFrameRef={exportFrameRef}
         />
       </section>
     </main>

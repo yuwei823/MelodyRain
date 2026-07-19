@@ -283,7 +283,8 @@ export function useProjectLoader({ onProjectLoaded, onSettingsLoaded }: UseProje
         link.href = url;
         link.download = PROJECT_SETTINGS_FILE_NAME;
         link.click();
-        URL.revokeObjectURL(url);
+        // Revoke asynchronously so the browser can start the download first.
+        setTimeout(() => URL.revokeObjectURL(url), 0);
         setStatus(`Settings exported; place ${PROJECT_SETTINGS_FILE_NAME} in the media folder / 参数文件已导出，请将 ${PROJECT_SETTINGS_FILE_NAME} 放入素材文件夹`);
       }
       setError(null);

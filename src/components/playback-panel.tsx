@@ -98,7 +98,7 @@ export function PlaybackPanel({
         <div className="transport-stats">
           <span>{snapshot.effectiveBpm.toFixed(0)} BPM</span>
           <span>♩ {snapshot.scoreQuarter.toFixed(2)}</span>
-          <span>Frame / 当前帧 {project ? `${currentFrame} / ${totalFrames - 1}` : "—"}</span>
+          <span>Frame / 当前帧 {project ? `${currentFrame + 1} / ${totalFrames}` : "—"}</span>
         </div>
         <div className="sidebar-active-notes" aria-live="polite">
           <span className="active-label">Active MIDI notes / 当前 MIDI 音符</span>

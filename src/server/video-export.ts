@@ -1,9 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { createReadStream, existsSync } from "node:fs";
-import { mkdir, rename, rm } from "node:fs/promises";
+import { mkdir, readdir, rename, rm } from "node:fs/promises";
 import path from "node:path";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { chromium, type Browser } from "playwright-core";
+import {
+  VIDEO_EXPORT_FPS,
+  VIDEO_EXPORT_PRE_ROLL_MS,
+  videoExportFullFrameCount,
+} from "../lib/video-export.js";
 
 export type ExportPhase = "queued" | "rendering" | "completed" | "cancelled" | "error";
 export type ExportQuality = "high" | "standard";
@@ -35,8 +40,30 @@ export interface ExportJob {
 }
 
 const jobs = new Map<string, ExportJob>();
-const FPS = 30;
-const PRE_ROLL_MS = 1_200;
+const cleanupTimers = new Map<string, NodeJS.Timeout>();
+const FPS = VIDEO_EXPORT_FPS;
+const PRE_ROLL_MS = VIDEO_EXPORT_PRE_ROLL_MS;
+const JOB_RETENTION_MS = 10 * 60 * 1_000;
+
+// Failed or cancelled jobs are never deleted by the client, so they expire
+// here; otherwise their uploads and partial MP4s pile up in the temp dir.
+function scheduleExportJobCleanup(job: ExportJob): void {
+  clearExportJobCleanup(job.id);
+  const timer = setTimeout(() => {
+    cleanupTimers.delete(job.id);
+    void removeExportJob(job).catch(() => undefined);
+  }, JOB_RETENTION_MS);
+  timer.unref();
+  cleanupTimers.set(job.id, timer);
+}
+
+function clearExportJobCleanup(id: string): void {
+  const timer = cleanupTimers.get(id);
+  if (timer) {
+    clearTimeout(timer);
+    cleanupTimers.delete(id);
+  }
+}
 
 function chromeExecutable(): string {
   const candidates = [
@@ -161,6 +188,9 @@ function waitForProcess(process: ChildProcessWithoutNullStreams): Promise<void> 
 export async function runExportJob(job: ExportJob, appUrl: string): Promise<void> {
   const audio = job.assets.find((asset) => asset.field === "audio");
   if (!audio) throw new Error("Audio file missing / 缺少音频文件");
+  // Kept outside the try so the catch path can always settle it: a rejected
+  // waitForProcess promise without a handler would crash the server process.
+  let ffmpegDone: Promise<Error | null> | null = null;
   try {
     job.phase = "rendering";
     const browser = await chromium.launch({
@@ -177,7 +207,7 @@ export async function runExportJob(job: ExportJob, appUrl: string): Promise<void
     await page.goto(`${appUrl}/?exportJob=${job.id}`, { waitUntil: "networkidle" });
     await page.waitForFunction(() => document.documentElement.dataset.exportReady === "true", undefined, { timeout: 60_000 });
     const durationMs = await page.evaluate(() => Number(document.documentElement.dataset.exportDurationMs ?? 0));
-    const fullFrameCount = Math.ceil(((durationMs + PRE_ROLL_MS) * FPS) / 1_000) + 1;
+    const fullFrameCount = videoExportFullFrameCount(durationMs, FPS, PRE_ROLL_MS);
     if (job.startFrame < 0 || job.startFrame >= job.endFrame || job.endFrame > fullFrameCount) {
       throw new Error(`Invalid export frame range ${job.startFrame}–${job.endFrame}; full range is 0–${fullFrameCount}`);
     }
@@ -199,7 +229,12 @@ export async function runExportJob(job: ExportJob, appUrl: string): Promise<void
       "-movflags", "+faststart", job.outputPath,
     ], { stdio: ["pipe", "pipe", "pipe"] });
     job.ffmpeg = ffmpeg;
-    const ffmpegDone = waitForProcess(ffmpeg);
+    // Never reject: cancellation or a mid-render failure must settle as a
+    // value, because the loop can bail before anything awaits this promise.
+    ffmpegDone = waitForProcess(ffmpeg).then(
+      () => null,
+      (error: unknown) => error instanceof Error ? error : new Error(String(error)),
+    );
     const frameElement = page.locator(".portrait-frame");
     for (let index = 0; index < job.totalFrames; index += 1) {
       if (job.cancelled) throw new Error("EXPORT_CANCELLED");
@@ -216,7 +251,8 @@ export async function runExportJob(job: ExportJob, appUrl: string): Promise<void
       job.progress = job.completedFrames / job.totalFrames;
     }
     ffmpeg.stdin.end();
-    await ffmpegDone;
+    const ffmpegError = await ffmpegDone;
+    if (ffmpegError) throw ffmpegError;
     job.phase = "completed";
     job.progress = 1;
   } catch (error) {
@@ -227,6 +263,12 @@ export async function runExportJob(job: ExportJob, appUrl: string): Promise<void
       job.error = error instanceof Error ? error.message : String(error);
     }
     job.ffmpeg?.kill();
+    // ffmpegDone can no longer reject, so this just waits for the process to
+    // actually exit after the kill above.
+    if (ffmpegDone) await ffmpegDone;
+    // Cancelled and failed jobs are never cleaned up by the client; expire
+    // them so uploads and partial outputs do not accumulate on disk.
+    scheduleExportJobCleanup(job);
   } finally {
     await job.browser?.close().catch(() => undefined);
     job.browser = undefined;
@@ -241,10 +283,33 @@ export async function cancelExportJob(job: ExportJob): Promise<void> {
 }
 
 export async function removeExportJob(job: ExportJob): Promise<void> {
+  clearExportJobCleanup(job.id);
   jobs.delete(job.id);
   await rm(job.directory, { recursive: true, force: true });
 }
 
 export function exportResultStream(job: ExportJob) {
   return createReadStream(job.outputPath);
+}
+
+// Removes leftovers from previous runs (crashes, killed processes) so the
+// temp directory does not grow forever. Only directories without a live job
+// are touched; also empties the multer upload staging area.
+export async function cleanupStaleExportJobs(root: string): Promise<void> {
+  let entries;
+  try {
+    entries = await readdir(root, { withFileTypes: true });
+  } catch {
+    return; // root does not exist yet
+  }
+  await Promise.all(entries.map(async (entry) => {
+    if (entry.name === "uploads" && entry.isDirectory()) {
+      const staged = await readdir(path.join(root, entry.name)).catch(() => [] as string[]);
+      await Promise.all(staged.map((file) =>
+        rm(path.join(root, entry.name, file), { recursive: true, force: true }).catch(() => undefined)));
+      return;
+    }
+    if (!entry.isDirectory() || jobs.has(entry.name)) return;
+    await rm(path.join(root, entry.name), { recursive: true, force: true }).catch(() => undefined);
+  }));
 }

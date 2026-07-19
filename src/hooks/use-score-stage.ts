@@ -2,10 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { MidiTimeline } from "../lib/midi";
 import { PerformanceEffectLayer, mergePerformanceVisuals, type PerformanceEffectConfig } from "../lib/performance-effect-layer";
 import { RainLayer } from "../lib/rain-layer";
-import { PORTRAIT_RENDER_PROFILE } from "../lib/render-profile";
 import { ScoreCamera } from "../lib/score-camera";
 import { ScoreMaskLayer, type ScoreMaskSource } from "../lib/score-mask-layer";
-import { ScoreRenderer } from "../lib/score-renderer";
+import { ScoreRenderer, type ScoreTarget, type TimedRainSymbol } from "../lib/score-renderer";
 import { ScoreTimelineLayer } from "../lib/score-timeline-layer";
 import { resolveFrameColorConfig, type FrameColorRangeSettings } from "../lib/frame-color-ranges";
 import { videoExportCurrentFrame, videoExportFrameCount } from "../lib/video-export";
@@ -45,11 +44,15 @@ export function useScoreStage(options: ScoreStageOptions) {
   const performanceEffectConfigRef = useRef(performanceEffectConfig);
   const frameColorRangeSettingsRef = useRef(frameColorRangeSettings);
   const midiTimelineRef = useRef<MidiTimeline | null>(null);
+  const renderTargetsRef = useRef<ScoreTarget[] | null>(null);
+  const renderRestsRef = useRef<TimedRainSymbol[]>([]);
+  const connectedNoteModeRef = useRef(connectedNoteMode);
   maskSourceRef.current = maskSource;
   maskBlackMixPercentRef.current = maskBlackMixPercent;
   paperTransparencyPercentRef.current = paperTransparencyPercent;
   performanceEffectConfigRef.current = performanceEffectConfig;
   frameColorRangeSettingsRef.current = frameColorRangeSettings;
+  connectedNoteModeRef.current = connectedNoteMode;
 
   const update = useCallback((snapshot: TransportSnapshot) => {
     rainLayerRef.current?.update(snapshot.sourceTimeMs);
@@ -79,6 +82,8 @@ export function useScoreStage(options: ScoreStageOptions) {
       scoreCameraRef.current = null;
       scoreMaskLayerRef.current = null;
       performanceEffectLayerRef.current = null;
+      renderTargetsRef.current = null;
+      renderRestsRef.current = [];
     };
     disposeLayers();
     const renderHost = document.createElement("div");
@@ -87,13 +92,15 @@ export function useScoreStage(options: ScoreStageOptions) {
     setTargetCount(0);
     setStatus("Laying out SVG sheet music… / 正在排版 SVG 五线谱…");
     const renderer = new ScoreRenderer(renderHost);
-    void renderer.render(project.musicXml, measuresPerSystem, PORTRAIT_RENDER_PROFILE.scoreScale)
+    void renderer.render(project.musicXml, measuresPerSystem)
       .then(({ targets, restSymbols, revealElements, growingSpans, maskElements }) => {
         if (cancelled) return;
+        renderTargetsRef.current = targets;
+        renderRestsRef.current = restSymbols;
         const timeline = new MidiTimeline(project.midi);
         midiTimelineRef.current = timeline;
         const rainLayer = new RainLayer(host, timeline);
-        rainLayer.setEvents(project.midi.events, targets, restSymbols, connectedNoteMode);
+        rainLayer.setEvents(project.midi.events, targets, restSymbols, connectedNoteModeRef.current);
         const timeMs = currentSourceTimeMs() ?? -TRANSPORT_PRE_ROLL_MS - 1;
         rainLayer.update(timeMs);
         rainLayerRef.current = rainLayer;
@@ -143,7 +150,26 @@ export function useScoreStage(options: ScoreStageOptions) {
       disposeLayers();
       renderHost.remove();
     };
-  }, [connectedNoteMode, currentSourceTimeMs, measuresPerSystem, project, setError, setStatus]);
+  }, [currentSourceTimeMs, measuresPerSystem, project, setError, setStatus]);
+
+  // Switching connected-note mode only re-groups the rain symbols and the
+  // performance visuals; the OSMD layout above is unaffected, so it reuses
+  // the rendered targets instead of re-laying out the whole score.
+  useEffect(() => {
+    const rainLayer = rainLayerRef.current;
+    const targets = renderTargetsRef.current;
+    if (!rainLayer || !targets || !project) return;
+    rainLayer.setEvents(project.midi.events, targets, renderRestsRef.current, connectedNoteMode);
+    rainLayer.update(currentSourceTimeMs() ?? -TRANSPORT_PRE_ROLL_MS - 1);
+    const effectLayer = performanceEffectLayerRef.current;
+    if (effectLayer) {
+      effectLayer.setVisuals(mergePerformanceVisuals(
+        rainLayer.performanceVisuals(),
+        scoreTimelineLayerRef.current?.performanceVisuals() ?? { maskElements: [], paints: [] },
+      ));
+      effectLayer.update();
+    }
+  }, [connectedNoteMode, currentSourceTimeMs, project]);
 
   useEffect(() => {
     scoreMaskLayerRef.current?.setSource(maskSource);

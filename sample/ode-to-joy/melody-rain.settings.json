@@ -3,7 +3,7 @@
   "title": "🎶 Melody Rain 🎶",
   "titleColor": "#25364A",
   "titleColorMode": "auto",
-  "measuresPerSystem": 1,
+  "measuresPerSystem": 2,
   "backgroundMode": "color",
   "backgroundColor": "#F7F8F6",
   "backgroundImageFile": "background.jpeg",
@@ -18,14 +18,14 @@
         "id": "8004c410-d04b-4bc6-93f2-65e6575d7789",
         "startFrame": 0,
         "endFrame": 227,
-        "mode": "rainbow",
+        "mode": "solid",
         "color": "#1CAEE8"
       },
       {
         "id": "7d388468-165c-436d-b4c1-1a5da73cc4a3",
         "startFrame": 227,
         "endFrame": 434,
-        "mode": "solid",
+        "mode": "rainbow",
         "color": "#087AA1"
       },
       {

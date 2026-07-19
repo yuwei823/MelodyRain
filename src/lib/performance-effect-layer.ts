@@ -204,7 +204,7 @@ export class PerformanceEffectLayer {
 
   setConfig(config: PerformanceEffectConfig): void {
     const changedMode = config.mode !== this.config.mode;
-    const changedPalette = JSON.stringify(config.palette) !== JSON.stringify(this.config.palette);
+    const changedPalette = !palettesEqual(config.palette, this.config.palette);
     this.config = { ...config, mixAmount: clampUnit(config.mixAmount) };
     this.tintRect.setAttribute("fill", this.config.mixColor);
     this.tintRect.setAttribute("opacity", String(this.config.mixAmount));
@@ -552,4 +552,11 @@ export class PerformanceEffectLayer {
     });
     return sizeChanged;
   }
+}
+function palettesEqual(left: Record<string, string> | undefined, right: Record<string, string> | undefined): boolean {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  return leftKeys.length === rightKeys.length && leftKeys.every((key) => left[key] === right[key]);
 }
