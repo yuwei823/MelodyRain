@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { formatDuration } from "../lib/format";
-import { VIDEO_EXPORT_PROFILE, videoExportFrameCount } from "../lib/video-export";
+import { VIDEO_EXPORT_PROFILES, videoExportFrameCount, type VideoExportQuality } from "../lib/video-export";
 import type { VideoExportPhase } from "../hooks/use-video-export";
 
 interface ExportCardProps {
@@ -9,7 +9,7 @@ interface ExportCardProps {
   phase: VideoExportPhase;
   progress: number;
   error: string | null;
-  onStart(fileName: string): void;
+  onStart(fileName: string, quality: VideoExportQuality): void;
   onCancel(): void;
 }
 
@@ -42,6 +42,8 @@ export function ExportCard({
 }: ExportCardProps) {
   const totalFrames = videoExportFrameCount(durationMs);
   const [fileName, setFileName] = useState(exportFileName(projectLabel));
+  const [quality, setQuality] = useState<VideoExportQuality>("standard");
+  const profile = VIDEO_EXPORT_PROFILES[quality];
   const active = phase === "preparing" || phase === "rendering" || phase === "finalizing";
   useEffect(() => { setFileName(exportFileName(projectLabel)); }, [projectLabel]);
   return (
@@ -51,9 +53,28 @@ export function ExportCard({
         <span>{PHASE_LABELS[phase]}</span>
       </div>
 
+      <fieldset className="export-quality" disabled={active}>
+        <legend>Quality / 导出质量</legend>
+        {(Object.entries(VIDEO_EXPORT_PROFILES) as Array<
+          [VideoExportQuality, (typeof VIDEO_EXPORT_PROFILES)[VideoExportQuality]]
+        >).map(([value, option]) => (
+          <label key={value} className={quality === value ? "is-active" : ""}>
+            <input
+              type="radio"
+              name="export-quality"
+              value={value}
+              checked={quality === value}
+              onChange={() => setQuality(value)}
+            />
+            <strong>{option.label}</strong>
+            <small>{option.width} × {option.height}</small>
+          </label>
+        ))}
+      </fieldset>
+
       <div className="export-specs" aria-label="Export settings / 导出设置">
-        <div><span>Resolution / 分辨率</span><strong>{VIDEO_EXPORT_PROFILE.width} × {VIDEO_EXPORT_PROFILE.height}</strong></div>
-        <div><span>Frame rate / 帧率</span><strong>{VIDEO_EXPORT_PROFILE.fps} FPS</strong></div>
+        <div><span>Resolution / 分辨率</span><strong>{profile.width} × {profile.height}</strong></div>
+        <div><span>Frame rate / 帧率</span><strong>{profile.fps} FPS</strong></div>
         <div><span>Format / 格式</span><strong>MP4 · H.264</strong></div>
         <div><span>Duration / 时长</span><strong>{formatDuration(durationMs)}</strong></div>
         <div><span>Total frames / 总帧数</span><strong>{durationMs > 0 ? totalFrames : "—"}</strong></div>
@@ -81,7 +102,7 @@ export function ExportCard({
         className="export-button"
         type="button"
         disabled={!active && (!projectLabel || !fileName.trim())}
-        onClick={() => active ? onCancel() : onStart(fileName.trim())}
+        onClick={() => active ? onCancel() : onStart(fileName.trim(), quality)}
       >
         {active ? "Cancel export / 取消导出" : "Export video / 导出视频"}
       </button>

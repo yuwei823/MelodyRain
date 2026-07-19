@@ -11,6 +11,7 @@ import {
   exportJob,
   exportJobManifest,
   exportJobStatus,
+  type ExportQuality,
   removeExportJob,
   runExportJob,
 } from "./video-export.js";
@@ -71,7 +72,8 @@ app.post("/api/export/jobs", upload.any(), async (request, response) => {
       response.status(400).json({ code: "EXPORT_ASSETS_MISSING" });
       return;
     }
-    const job = await createExportJob(exportRoot, files);
+    const quality: ExportQuality = request.body.quality === "standard" ? "standard" : "high";
+    const job = await createExportJob(exportRoot, files, quality);
     response.status(202).json(exportJobStatus(job));
     const appUrl = `http://${host}:${port}`;
     void runExportJob(job, appUrl);

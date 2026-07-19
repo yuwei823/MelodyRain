@@ -6,6 +6,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { chromium, type Browser } from "playwright-core";
 
 export type ExportPhase = "queued" | "rendering" | "completed" | "cancelled" | "error";
+export type ExportQuality = "high" | "standard";
 
 export interface ExportAsset {
   field: string;
@@ -28,6 +29,7 @@ export interface ExportJob {
   browser?: Browser;
   ffmpeg?: ChildProcessWithoutNullStreams;
   cancelled: boolean;
+  quality: ExportQuality;
 }
 
 const jobs = new Map<string, ExportJob>();
@@ -49,6 +51,7 @@ function chromeExecutable(): string {
 export async function createExportJob(
   root: string,
   uploaded: Array<{ fieldname: string; originalname: string; path: string; mimetype: string }>,
+  quality: ExportQuality,
 ): Promise<ExportJob> {
   const id = randomUUID();
   const directory = path.join(root, id);
@@ -76,6 +79,7 @@ export async function createExportJob(
     assets,
     createdAt: Date.now(),
     cancelled: false,
+    quality,
   };
   jobs.set(id, job);
   return job;
@@ -93,6 +97,7 @@ export function exportJobStatus(job: ExportJob) {
     completedFrames: job.completedFrames,
     totalFrames: job.totalFrames,
     error: job.error,
+    quality: job.quality,
   };
 }
 
@@ -140,7 +145,7 @@ export async function runExportJob(job: ExportJob, appUrl: string): Promise<void
     job.browser = browser;
     const context = await browser.newContext({
       viewport: { width: 900, height: 1100 },
-      deviceScaleFactor: 2,
+      deviceScaleFactor: job.quality === "high" ? 2 : 1,
     });
     const page = await context.newPage();
     await page.goto(`${appUrl}/?exportJob=${job.id}`, { waitUntil: "networkidle" });
@@ -150,7 +155,10 @@ export async function runExportJob(job: ExportJob, appUrl: string): Promise<void
     const ffmpeg = spawn("ffmpeg", [
       "-y", "-f", "image2pipe", "-vcodec", "png", "-framerate", String(FPS), "-i", "pipe:0",
       "-itsoffset", String(PRE_ROLL_MS / 1_000), "-i", audio.path,
-      "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
+      "-c:v", "libx264",
+      "-preset", job.quality === "high" ? "medium" : "veryfast",
+      "-crf", job.quality === "high" ? "18" : "22",
+      "-pix_fmt", "yuv420p",
       "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart", job.outputPath,
     ], { stdio: ["pipe", "pipe", "pipe"] });
     job.ffmpeg = ffmpeg;

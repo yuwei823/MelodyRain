@@ -11,7 +11,7 @@ The current version supports portrait-format previews in the browser and local M
 - Renders SVG sheet music with OpenSheetMusicDisplay;
 - Automatically matches MXL/MusicXML, MIDI, and MP3 files with the same base name in an asset folder;
 - Supports play, pause, rewind, seeking, and `0.9×`, `0.95×`, and `1×` playback speeds;
-- Deterministically renders frames with local Chrome and exports `1080 × 1920`, 30 FPS H.264/AAC MP4 video through FFmpeg, with progress and cancellation;
+- Deterministically renders frames with local Chrome and exports 30 FPS H.264/AAC MP4 video through FFmpeg, with standard/high quality, progress, and cancellation;
 - Animates notes, chords, rests, and related notation as they fall, hit, and settle onto the score;
 - Uses a three-phase vertical camera: stationary until the performance reaches the screen midpoint, constant-speed scrolling, then a stationary end phase after the score reaches its maximum offset;
 - Uses a fixed image or solid color as the score mask source, with adjustable black mixing and paper transparency;
@@ -25,7 +25,8 @@ The current version supports portrait-format previews in the browser and local M
 
 The local Express service creates an export job. Playwright drives an installed Chrome or Edge browser to render deterministic frames from absolute timeline times, then pipes PNG frames to FFmpeg and muxes them with the supplied MP3 as an H.264/AAC MP4. Preview and export share the same Transport, score camera, and animation-state calculations.
 
-- Fixed `1080 × 1920`, 9:16, 30 FPS MP4 output;
+- Standard quality defaults to `540 × 960` at 30 FPS with a faster encoder preset;
+- High quality outputs `1080 × 1920` at 30 FPS;
 - Full-score export with a 1.2-second falling-note pre-roll;
 - Progress, cancellation, and error reporting;
 - The current display title is the default filename, with Windows-invalid filename characters replaced automatically;

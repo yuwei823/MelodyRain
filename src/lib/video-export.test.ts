@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { TRANSPORT_PRE_ROLL_MS } from "./transport";
-import { videoExportFrame, videoExportFrameCount, videoExportProgress } from "./video-export";
+import { VIDEO_EXPORT_PROFILES, videoExportFrame, videoExportFrameCount, videoExportProgress } from "./video-export";
 
 describe("video export timeline", () => {
+  it("provides standard and high-quality portrait profiles", () => {
+    expect(VIDEO_EXPORT_PROFILES.standard).toMatchObject({ width: 540, height: 960, fps: 30 });
+    expect(VIDEO_EXPORT_PROFILES.high).toMatchObject({ width: 1080, height: 1920, fps: 30 });
+  });
+
   it("starts at the animation pre-roll and reaches source time zero exactly", () => {
     expect(videoExportFrame(0).sourceTimeMs).toBe(-TRANSPORT_PRE_ROLL_MS);
     expect(videoExportFrame(36).sourceTimeMs).toBe(0);

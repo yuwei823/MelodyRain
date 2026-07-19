@@ -1,12 +1,13 @@
 import { TRANSPORT_PRE_ROLL_MS } from "./transport";
 
-export const VIDEO_EXPORT_PROFILE = Object.freeze({
-  width: 1080,
-  height: 1920,
-  fps: 30,
-  mimeType: "video/mp4",
-  videoCodec: "avc1.640028",
+export type VideoExportQuality = "high" | "standard";
+
+export const VIDEO_EXPORT_PROFILES = Object.freeze({
+  high: Object.freeze({ width: 1080, height: 1920, fps: 30, label: "High / 高清" }),
+  standard: Object.freeze({ width: 540, height: 960, fps: 30, label: "Standard / 普通" }),
 });
+
+export const VIDEO_EXPORT_PROFILE = VIDEO_EXPORT_PROFILES.high;
 
 export interface VideoExportFrame {
   index: number;

@@ -5,6 +5,7 @@ import type { TransportSnapshot } from "../lib/transport";
 import type { LoadedProject } from "../hooks/use-project-loader";
 import { ExportCard } from "./export-card";
 import type { VideoExportPhase } from "../hooks/use-video-export";
+import type { VideoExportQuality } from "../lib/video-export";
 
 interface PlaybackPanelProps {
   project: LoadedProject | null;
@@ -21,7 +22,7 @@ interface PlaybackPanelProps {
   exportPhase: VideoExportPhase;
   exportProgress: number;
   exportError: string | null;
-  onStartExport(fileName: string): void;
+  onStartExport(fileName: string, quality: VideoExportQuality): void;
   onCancelExport(): void;
 }
 

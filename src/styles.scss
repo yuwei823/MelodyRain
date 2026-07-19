@@ -514,6 +514,57 @@ select:focus-visible {
     }
   }
 
+  .export-quality {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+
+    legend {
+      margin-bottom: 6px;
+      color: #8da2b8;
+      font-size: 10px;
+    }
+
+    label {
+      display: grid;
+      gap: 3px;
+      padding: 9px;
+      border: 1px solid var(--control-border);
+      border-radius: 8px;
+      background: var(--control-bg);
+      cursor: pointer;
+
+      &.is-active {
+        border-color: rgba(126, 211, 255, 0.7);
+        background: rgba(126, 211, 255, 0.1);
+      }
+    }
+
+    input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    strong {
+      color: #cbd9e9;
+      font-size: 11px;
+    }
+
+    small {
+      color: var(--muted);
+      font-size: 9px;
+    }
+
+    &:disabled {
+      opacity: 0.62;
+    }
+  }
+
   .export-file-name {
     display: grid;
     gap: 6px;
