@@ -114,12 +114,31 @@ export function exportJobManifest(job: ExportJob) {
 
 function writeFrame(stream: NodeJS.WritableStream, frame: Buffer): Promise<void> {
   return new Promise((resolve, reject) => {
-    if (stream.write(frame)) {
+    const cleanup = () => {
+      stream.removeListener("drain", handleDrain);
+      stream.removeListener("error", handleError);
+    };
+    const handleDrain = () => {
+      cleanup();
       resolve();
-      return;
+    };
+    const handleError = (error: Error) => {
+      cleanup();
+      reject(error);
+    };
+
+    stream.once("error", handleError);
+    try {
+      if (stream.write(frame)) {
+        cleanup();
+        resolve();
+        return;
+      }
+      stream.once("drain", handleDrain);
+    } catch (error) {
+      cleanup();
+      reject(error);
     }
-    stream.once("drain", resolve);
-    stream.once("error", reject);
   });
 }
 
