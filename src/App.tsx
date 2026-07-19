@@ -9,7 +9,12 @@ import { useScoreStage } from "./hooks/use-score-stage";
 import type { TransportSnapshot } from "./lib/transport";
 
 function stateLabel(state: TransportSnapshot["state"]): string {
-  return { idle: "待播放", playing: "播放中", paused: "已暂停", ended: "已结束" }[state];
+  return {
+    idle: "Ready / 待播放",
+    playing: "Playing / 播放中",
+    paused: "Paused / 已暂停",
+    ended: "Ended / 已结束",
+  }[state];
 }
 
 export default function App() {
@@ -65,7 +70,7 @@ export default function App() {
     try {
       await transport.toggle();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "浏览器阻止了音频播放");
+      setError(caught instanceof Error ? caught.message : "Audio playback was blocked / 浏览器阻止了音频播放");
     }
   };
 
@@ -74,17 +79,12 @@ export default function App() {
       <header className="hero">
         <div>
           <h1>Melody Rain</h1>
-          <p className="subtitle">MusicXML 乐谱、MIDI 时间轴与音乐，由同一个 Transport 驱动。</p>
+          <p className="subtitle">slogan</p>
         </div>
         <div className="hero-meta">
           <div className={`status-pill ${error ? "is-error" : ""}`}>
             <span className="status-dot" />
             {error ?? status}
-          </div>
-          <div className="transport-stats">
-            <span>{snapshot.effectiveBpm.toFixed(0)} BPM</span>
-            <span>♩ {snapshot.scoreQuarter.toFixed(2)}</span>
-            <span>{stateLabel(snapshot.state)}</span>
           </div>
         </div>
       </header>
@@ -147,7 +147,7 @@ export default function App() {
           onTempoScaleChange={transport.setTempoScale}
         />
         <StagePanel
-          title={customTitle.trim() || project?.label || "等待素材"}
+          title={customTitle.trim() || project?.label || "Waiting for media / 等待素材"}
           titleColor={titleColor}
           scoreViewportRef={scoreViewportRef}
           scoreContentClipRef={scoreContentClipRef}

@@ -71,7 +71,7 @@ export function useScoreStage(options: ScoreStageOptions) {
     renderHost.className = "score-render-content";
     host.replaceChildren(renderHost);
     setTargetCount(0);
-    setStatus("正在排版 SVG 五线谱…");
+    setStatus("Laying out SVG sheet music… / 正在排版 SVG 五线谱…");
     const renderer = new ScoreRenderer(renderHost);
     void renderer.render(project.musicXml, measuresPerSystem, PORTRAIT_RENDER_PROFILE.scoreScale)
       .then(({ targets, restSymbols, revealElements, growingSpans, maskElements }) => {
@@ -109,7 +109,7 @@ export function useScoreStage(options: ScoreStageOptions) {
           scoreCameraRef.current = camera;
         }
         setTargetCount(targets.length);
-        setStatus("谱面、MIDI 与音频已就绪");
+        setStatus("Score, MIDI and audio ready / 谱面、MIDI 与音频已就绪");
       })
       .catch((caught: unknown) => {
         if (!cancelled) setError(caught instanceof Error ? caught.message : String(caught));

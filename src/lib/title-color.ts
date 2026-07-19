@@ -53,7 +53,7 @@ export async function readableTitleColorForImage(imageUrl: string): Promise<stri
   image.decoding = "async";
   await new Promise<void>((resolve, reject) => {
     image.onload = () => resolve();
-    image.onerror = () => reject(new Error("无法读取标题区域背景图片"));
+    image.onerror = () => reject(new Error("Unable to read the title-area background image / 无法读取标题区域背景图片"));
     image.src = imageUrl;
   });
 

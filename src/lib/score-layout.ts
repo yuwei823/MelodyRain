@@ -6,7 +6,7 @@ export function applyMeasuresPerSystem(musicXml: string, measuresPerSystem: numb
   const count = Math.max(1, Math.round(measuresPerSystem));
   const document = new DOMParser().parseFromString(musicXml, "application/xml");
   const error = document.querySelector("parsererror");
-  if (error) throw new Error(`MusicXML 布局处理失败：${error.textContent?.trim() ?? "未知错误"}`);
+  if (error) throw new Error(`MusicXML layout failed / MusicXML 布局处理失败：${error.textContent?.trim() ?? "Unknown error / 未知错误"}`);
 
   const parts = [...document.getElementsByTagName("part")];
   for (const part of parts) {

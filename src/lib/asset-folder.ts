@@ -69,7 +69,7 @@ export function matchProjectFolderAssets<T extends FolderAsset>(files: T[]): Mat
   if (scores.length === 0) missing.push("MXL/MusicXML");
   if (midis.length === 0) missing.push("MIDI");
   if (audios.length === 0) missing.push("MP3");
-  if (missing.length > 0) throw new Error(`素材文件夹缺少：${missing.join("、")}`);
+  if (missing.length > 0) throw new Error(`Media folder is missing / 素材文件夹缺少：${missing.join("、")}`);
 
   const sharedStems = [...new Set(scores.map((file) => stem(file.name)))].filter((candidate) =>
     midis.some((file) => stem(file.name) === candidate) && audios.some((file) => stem(file.name) === candidate),
@@ -86,7 +86,7 @@ export function matchProjectFolderAssets<T extends FolderAsset>(files: T[]): Mat
   }
 
   if (sharedStems.length > 1) {
-    throw new Error(`素材文件夹包含多组同名资源，无法自动确定：${sharedStems.join("、")}`);
+    throw new Error(`Multiple matching media sets found; unable to choose automatically / 素材文件夹包含多组同名资源，无法自动确定：${sharedStems.join("、")}`);
   }
 
   if (scores.length === 1 && midis.length === 1 && audios.length === 1) {
@@ -98,7 +98,7 @@ export function matchProjectFolderAssets<T extends FolderAsset>(files: T[]): Mat
     };
   }
 
-  throw new Error("素材文件夹内存在多个候选文件，且文件名无法组成唯一的一组资源");
+  throw new Error("Multiple candidate files cannot form one unique media set / 素材文件夹内存在多个候选文件，且文件名无法组成唯一的一组资源");
 }
 
 export function assetRelativePath(asset: FolderAsset): string {

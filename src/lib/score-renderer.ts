@@ -128,7 +128,7 @@ export class ScoreRenderer {
   }
 
   private requireOsmd(): OpenSheetMusicDisplay {
-    if (!this.osmd) throw new Error("OSMD 尚未加载");
+    if (!this.osmd) throw new Error("OSMD is not loaded / OSMD 尚未加载");
     return this.osmd;
   }
 

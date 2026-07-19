@@ -31,21 +31,21 @@ export function PlaybackPanel({
 }: PlaybackPanelProps) {
   return (
     <aside className="playback-panel">
-      <div className="sidebar-transport" aria-label="播放控制">
-        <audio ref={audioRef} aria-label="乐谱音频" />
+      <div className="sidebar-transport" aria-label="Playback controls / 播放控制">
+        <audio ref={audioRef} aria-label="Score audio / 乐谱音频" />
         <div className="sidebar-transport-heading">
-          <p className="step-label">PLAYBACK</p>
+          <p className="step-label">PLAY</p>
           <span>{stateLabel}</span>
         </div>
         <div className="playback-buttons">
-          <button className="round-button" type="button" onClick={onRewind} aria-label="回到开头">↺</button>
+          <button className="round-button" type="button" onClick={onRewind} aria-label="Rewind / 回到开头">↺</button>
           <button className="play-button" type="button" onClick={onTogglePlayback}>
-            {snapshot.state === "playing" ? "暂停" : "播放"}
+            {snapshot.state === "playing" ? "Pause / 暂停" : "Play / 播放"}
           </button>
         </div>
         <div className="timeline-control">
           <input
-            aria-label="播放进度"
+            aria-label="Playback progress / 播放进度"
             type="range"
             min="0"
             max="1"
@@ -58,8 +58,9 @@ export function PlaybackPanel({
             <span>{formatDuration(snapshot.durationMs || project?.midi.durationMs || 0)}</span>
           </div>
         </div>
-        <div className="speed-group" aria-label="播放速度">
-          {[0.5, 0.75, 1].map((speed) => (
+
+        <div className="speed-group" aria-label="Playback speed / 播放速度">
+          {[0.85, 0.9, 0.95].map((speed) => (
             <button
               type="button"
               className={snapshot.tempoScale === speed ? "is-active" : ""}
@@ -70,8 +71,12 @@ export function PlaybackPanel({
             </button>
           ))}
         </div>
+        <div className="transport-stats">
+          <span>{snapshot.effectiveBpm.toFixed(0)} BPM</span>
+          <span>♩ {snapshot.scoreQuarter.toFixed(2)}</span>
+        </div>
         <div className="sidebar-active-notes" aria-live="polite">
-          <span className="active-label">当前 MIDI 音符</span>
+          <span className="active-label">Active MIDI notes / 当前 MIDI 音符</span>
           <div className="note-list">
             {activeNotes.length === 0 ? <span className="empty-note">—</span> : activeNotes.map((note) => (
               <span className="note-chip" key={note.id}>{note.name}<small>{Math.round(note.velocity * 127)}</small></span>
@@ -82,12 +87,12 @@ export function PlaybackPanel({
 
       {project && (
         <div className="facts">
-          <div><span>乐谱</span><strong>{project.score.title}</strong></div>
-          <div><span>乐器</span><strong>{project.score.partNames.join(" · ") || "—"}</strong></div>
-          <div><span>小节</span><strong>{project.score.measureCount}</strong></div>
-          <div><span>MIDI 音符</span><strong>{project.midi.noteCount}</strong></div>
-          <div><span>Tempo events</span><strong>{project.midi.tempoMap.length}</strong></div>
-          <div><span>SVG 落点</span><strong>{targetCount}</strong></div>
+          <div><span>Score / 乐谱</span><strong>{project.score.title}</strong></div>
+          <div><span>Instruments / 乐器</span><strong>{project.score.partNames.join(" · ") || "—"}</strong></div>
+          <div><span>Measures / 小节</span><strong>{project.score.measureCount}</strong></div>
+          <div><span>MIDI notes / MIDI 音符</span><strong>{project.midi.noteCount}</strong></div>
+          <div><span>Tempo events / 速度事件</span><strong>{project.midi.tempoMap.length}</strong></div>
+          <div><span>SVG targets / SVG 落点</span><strong>{targetCount}</strong></div>
         </div>
       )}
     </aside>

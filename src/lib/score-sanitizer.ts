@@ -95,7 +95,7 @@ function sanitizeNodes(nodes: XmlNode[], rules: SanitizeRules): XmlNode[] {
 function transformMusicXml(musicXml: string, rules: SanitizeRules): string {
   const validation = XMLValidator.validate(musicXml);
   if (validation !== true) {
-    throw new Error(`MusicXML 无效：${validation.err.msg}（第 ${validation.err.line} 行）`);
+    throw new Error(`Invalid MusicXML / MusicXML 无效：${validation.err.msg} (line / 第 ${validation.err.line} 行)`);
   }
   const document = parser.parse(musicXml) as XmlNode[];
   return builder.build(sanitizeNodes(document, rules));

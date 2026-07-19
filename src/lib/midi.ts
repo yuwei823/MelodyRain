@@ -33,7 +33,7 @@ export interface MidiSummary {
 
 export function parseMidi(buffer: ArrayBuffer): MidiSummary {
   const bytes = new Uint8Array(buffer, 0, Math.min(4, buffer.byteLength));
-  if (String.fromCharCode(...bytes) !== "MThd") throw new Error("文件不是有效的 Standard MIDI File");
+  if (String.fromCharCode(...bytes) !== "MThd") throw new Error("Not a valid Standard MIDI File / 文件不是有效的 Standard MIDI File");
 
   const midi = new Midi(buffer);
   const events = midi.tracks

@@ -40,7 +40,6 @@ button { color: inherit; }
 .layout-control-heading strong { color: #cbd9e9; font-size: 13px; }
 .layout-control output { min-width: 38px; padding: 6px 10px; border-radius: 9px; background: rgba(93, 193, 232, .14); color: var(--cyan); text-align: center; font-size: 18px; font-weight: 750; }
 .layout-control input { width: 100%; margin: 14px 0 4px; accent-color: #67d6ff; }
-.layout-control p:last-child { margin: 4px 0 0; color: #6f859c; font-size: 10px; line-height: 1.5; }
 .background-control { display: grid; gap: 11px; }
 .background-control .step-label { margin-bottom: 4px; }
 .background-control strong { color: #cbd9e9; font-size: 13px; }

@@ -43,7 +43,7 @@ async function readScoreFile(file: File): Promise<string> {
 
 export function useProjectLoader({ onProjectLoaded, onSettingsLoaded }: UseProjectLoaderOptions) {
   const [project, setProject] = useState<LoadedProject | null>(null);
-  const [status, setStatus] = useState("请选择素材文件夹");
+  const [status, setStatus] = useState("Choose a media folder / 请选择素材文件夹");
   const [error, setError] = useState<string | null>(null);
   const [scoreFile, setScoreFile] = useState<File | null>(null);
   const [midiFile, setMidiFile] = useState<File | null>(null);
@@ -67,7 +67,7 @@ export function useProjectLoader({ onProjectLoaded, onSettingsLoaded }: UseProje
     projectSettingsFile: File | null,
     requestId: number,
   ) => {
-    setStatus("正在解析本地文件…");
+    setStatus("Parsing local files… / 正在解析本地文件…");
     setError(null);
     try {
       const [musicXml, midiBuffer] = await Promise.all([
@@ -97,11 +97,11 @@ export function useProjectLoader({ onProjectLoaded, onSettingsLoaded }: UseProje
         settings,
         revokeAudioUrl: true,
       });
-      setStatus(settings ? "素材和参数已加载" : "本地素材已加载");
-      if (settingsError) setError(`素材已加载，但参数文件读取失败：${settingsError}`);
+      setStatus(settings ? "Media and settings loaded / 素材和参数已加载" : "Local media loaded / 本地素材已加载");
+      if (settingsError) setError(`Media loaded, but settings could not be read / 素材已加载，但参数文件读取失败：${settingsError}`);
     } catch (caught) {
       if (requestId !== loadRequestRef.current) return;
-      setStatus("解析失败");
+      setStatus("Parsing failed / 解析失败");
       setError(caught instanceof Error ? caught.message : String(caught));
     }
   }, [adoptProject]);
@@ -114,7 +114,7 @@ export function useProjectLoader({ onProjectLoaded, onSettingsLoaded }: UseProje
     setBackgroundFiles([]);
     setSettingsFile(null);
     if (files.length === 0) {
-      setStatus("尚未选择素材文件夹");
+      setStatus("No media folder selected / 尚未选择素材文件夹");
       return;
     }
     try {
@@ -128,7 +128,7 @@ export function useProjectLoader({ onProjectLoaded, onSettingsLoaded }: UseProje
       setError(null);
       void loadLocalFiles(matched, nextSettingsFile, requestId);
     } catch (caught) {
-      setStatus("素材匹配失败");
+      setStatus("Media matching failed / 素材匹配失败");
       setError(caught instanceof Error ? caught.message : String(caught));
     }
   }, [loadLocalFiles]);
@@ -146,11 +146,11 @@ export function useProjectLoader({ onProjectLoaded, onSettingsLoaded }: UseProje
       if (!handle) return;
       setFolderName(handle.name);
       if (!await canReadFolder(handle)) {
-        setStatus(`已记住“${handle.name}”，请重新选择以授权读取。`);
+        setStatus(`Remembered “${handle.name}”; select it again to grant access. / 已记住“${handle.name}”，请重新选择以授权读取。`);
         return;
       }
       directoryHandleRef.current = handle;
-      setStatus(`正在重新读取“${handle.name}”…`);
+      setStatus(`Reloading “${handle.name}”… / 正在重新读取“${handle.name}”…`);
       selectAssetFolderFromFiles(await filesInFolder(handle));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
@@ -183,7 +183,7 @@ export function useProjectLoader({ onProjectLoaded, onSettingsLoaded }: UseProje
       const settings = parseProjectSettings(await file.text());
       setSettingsFile(file);
       onSettingsLoaded(settings);
-      setStatus(`参数已读取：${file.name}`);
+      setStatus(`Settings loaded / 参数已读取：${file.name}`);
       setError(null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
@@ -212,13 +212,13 @@ export function useProjectLoader({ onProjectLoaded, onSettingsLoaded }: UseProje
       if (handle?.getFileHandle) {
         let permission = await handle.queryPermission?.({ mode: "readwrite" });
         if (permission !== "granted") permission = await handle.requestPermission?.({ mode: "readwrite" });
-        if (permission !== "granted") throw new Error("未获得素材文件夹写入权限");
+        if (permission !== "granted") throw new Error("No write access to the media folder / 未获得素材文件夹写入权限");
         const fileHandle = await handle.getFileHandle(PROJECT_SETTINGS_FILE_NAME, { create: true });
         const writable = await fileHandle.createWritable();
         await writable.write(content);
         await writable.close();
         setSettingsFile(new File([content], PROJECT_SETTINGS_FILE_NAME, { type: "application/json" }));
-        setStatus(`参数已保存到素材文件夹：${PROJECT_SETTINGS_FILE_NAME}`);
+        setStatus(`Settings saved to media folder / 参数已保存到素材文件夹：${PROJECT_SETTINGS_FILE_NAME}`);
       } else {
         const url = URL.createObjectURL(new Blob([content], { type: "application/json" }));
         const link = document.createElement("a");
@@ -226,7 +226,7 @@ export function useProjectLoader({ onProjectLoaded, onSettingsLoaded }: UseProje
         link.download = PROJECT_SETTINGS_FILE_NAME;
         link.click();
         URL.revokeObjectURL(url);
-        setStatus(`参数文件已导出，请将 ${PROJECT_SETTINGS_FILE_NAME} 放入素材文件夹`);
+        setStatus(`Settings exported; place ${PROJECT_SETTINGS_FILE_NAME} in the media folder / 参数文件已导出，请将 ${PROJECT_SETTINGS_FILE_NAME} 放入素材文件夹`);
       }
       setError(null);
     } catch (caught) {

@@ -34,7 +34,7 @@ function openDatabase(): Promise<IDBDatabase> {
     const request = indexedDB.open(DATABASE_NAME, 1);
     request.onupgradeneeded = () => request.result.createObjectStore(STORE_NAME);
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error("无法打开本地项目设置"));
+    request.onerror = () => reject(request.error ?? new Error("Unable to open local project settings / 无法打开本地项目设置"));
   });
 }
 
@@ -44,7 +44,7 @@ async function readSetting<T>(key: string): Promise<T | null> {
     const transaction = database.transaction(STORE_NAME, "readonly");
     const request = transaction.objectStore(STORE_NAME).get(key);
     request.onsuccess = () => resolve((request.result as T | undefined) ?? null);
-    request.onerror = () => reject(request.error ?? new Error("无法读取本地项目设置"));
+    request.onerror = () => reject(request.error ?? new Error("Unable to read local project settings / 无法读取本地项目设置"));
   }).finally(() => database.close());
 }
 
@@ -54,7 +54,7 @@ async function writeSetting(key: string, value: unknown): Promise<void> {
     const transaction = database.transaction(STORE_NAME, "readwrite");
     transaction.objectStore(STORE_NAME).put(value, key);
     transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error ?? new Error("无法保存素材文件夹选择"));
+    transaction.onerror = () => reject(transaction.error ?? new Error("Unable to save media folder selection / 无法保存素材文件夹选择"));
   }).finally(() => database.close());
 }
 
@@ -64,7 +64,7 @@ export function canRememberFolder(): boolean {
 
 export async function chooseAssetFolder(): Promise<RememberedDirectoryHandle> {
   const picker = (window as DirectoryPickerWindow).showDirectoryPicker;
-  if (!picker) throw new Error("当前浏览器不支持记住素材文件夹；请使用 Chrome 或 Edge。");
+  if (!picker) throw new Error("This browser cannot remember media folders; use Chrome or Edge. / 当前浏览器不支持记住素材文件夹；请使用 Chrome 或 Edge。");
   return picker();
 }
 
