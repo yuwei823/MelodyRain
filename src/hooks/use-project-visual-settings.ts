@@ -42,8 +42,10 @@ export function useProjectVisualSettings() {
   const [selectedBackgroundIndex, setSelectedBackgroundIndex] = useState(0);
   const [backgroundImageUrl, setBackgroundImageUrl] = useState<string | null>(null);
   const projectBackgroundsRef = useRef<File[]>([]);
+  const lastDurationMsRef = useRef(0);
 
-  const applyProjectSettings = useCallback((settings: ProjectSettings) => {
+  const applyProjectSettings = useCallback((settings: ProjectSettings, durationMs?: number) => {
+    if (durationMs !== undefined) lastDurationMsRef.current = durationMs;
     setCustomTitle(settings.title);
     setTitleColor(settings.titleColor);
     setTitleColorMode(settings.titleColorMode);
@@ -55,7 +57,15 @@ export function useProjectVisualSettings() {
     setPerformanceMixColor(DEFAULT_PERFORMANCE_MIX_COLOR);
     setPerformanceMixPercent(settings.noteFrameEffect.mixStrengthPercent);
     setConnectedNoteMode(settings.connectedNoteMode);
-    setPerformanceColorRanges(settings.noteFrameEffect.ranges);
+    setPerformanceColorRanges(settings.noteFrameEffect.ranges.length > 0
+      ? settings.noteFrameEffect.ranges
+      : [{
+          id: "default-full-range",
+          startFrame: 0,
+          endFrame: videoExportFrameCount(lastDurationMsRef.current),
+          mode: "solid",
+          color: DEFAULT_PERFORMANCE_MIX_COLOR,
+        }]);
     const backgroundIndex = settings.backgroundImageFile
       ? projectBackgroundsRef.current.findIndex((file) => file.name === settings.backgroundImageFile)
       : -1;
@@ -65,17 +75,9 @@ export function useProjectVisualSettings() {
 
   const adoptProjectSettings = useCallback((project: LoadedProject) => {
     projectBackgroundsRef.current = project.backgrounds;
+    lastDurationMsRef.current = project.midi.durationMs;
     if (project.settings) {
-      applyProjectSettings(project.settings);
-      if (project.settings.noteFrameEffect.ranges.length === 0) {
-        setPerformanceColorRanges([{
-          id: "default-full-range",
-          startFrame: 0,
-          endFrame: videoExportFrameCount(project.midi.durationMs),
-          mode: "solid",
-          color: DEFAULT_PERFORMANCE_MIX_COLOR,
-        }]);
-      }
+      applyProjectSettings(project.settings, project.midi.durationMs);
       return;
     }
     setCustomTitle("");
