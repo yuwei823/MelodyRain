@@ -89,21 +89,26 @@ export default function App() {
     const exportWindow = window as unknown as {
       __MELODY_RAIN_EXPORT__?: { renderFrame(timeMs: number): Promise<void> };
     };
-    if (project && targetCount > 0) {
-      const timeline = new MidiTimeline(project.midi);
-      exportWindow.__MELODY_RAIN_EXPORT__ = {
-        async renderFrame(timeMs: number) {
-          stage.update(transportSnapshotAt(timeline, timeMs, project.midi.durationMs, 1, "playing"));
-          await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-        },
-      };
-      document.documentElement.dataset.exportReady = "true";
+    if (project) {
       document.documentElement.dataset.exportDurationMs = String(project.midi.durationMs);
+      if (targetCount > 0) {
+        const timeline = new MidiTimeline(project.midi);
+        exportWindow.__MELODY_RAIN_EXPORT__ = {
+          async renderFrame(timeMs: number) {
+            stage.update(transportSnapshotAt(timeline, timeMs, project.midi.durationMs, 1, "playing"));
+            await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+          },
+        };
+      } else {
+        document.documentElement.dataset.exportError = "No note targets found / 没有找到音符落点";
+      }
+      document.documentElement.dataset.exportReady = "true";
     }
     return () => {
       delete exportWindow.__MELODY_RAIN_EXPORT__;
       delete document.documentElement.dataset.exportReady;
       delete document.documentElement.dataset.exportDurationMs;
+      delete document.documentElement.dataset.exportError;
       document.body.classList.remove("export-mode");
     };
   }, [exportJobId, project, stage.update, targetCount]);

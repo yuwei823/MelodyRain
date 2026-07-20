@@ -213,6 +213,8 @@ export async function runExportJob(job: ExportJob, appUrl: string): Promise<void
     const page = await context.newPage();
     await page.goto(`${appUrl}/?exportJob=${job.id}`, { waitUntil: "networkidle" });
     await page.waitForFunction(() => document.documentElement.dataset.exportReady === "true", undefined, { timeout: 60_000 });
+    const exportError = await page.evaluate(() => document.documentElement.dataset.exportError ?? "");
+    if (exportError) throw new Error(exportError);
     const durationMs = await page.evaluate(() => Number(document.documentElement.dataset.exportDurationMs ?? 0));
     const fullFrameCount = videoExportFullFrameCount(durationMs, FPS, PRE_ROLL_MS);
     if (job.startFrame < 0 || job.startFrame >= job.endFrame || job.endFrame > fullFrameCount) {
