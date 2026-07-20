@@ -35,11 +35,14 @@ export interface ScoreViewportLayout {
 }
 
 export function scoreViewportLayout(style: CSSStyleDeclaration): ScoreViewportLayout {
+  // Fallbacks mirror the design-token values in `styles.scss` so the mask clip
+  // stays consistent with the visible paper area even when CSS variables are
+  // not yet resolved (for example, during tests or SSR snapshots).
   return {
-    top: cssPixelValue(style, "--score-toolbar-height", 78),
-    right: cssPixelValue(style, "--score-paper-inset-right", 10),
-    bottom: cssPixelValue(style, "--score-paper-inset-bottom", 20),
-    left: cssPixelValue(style, "--score-paper-inset-left", 10),
+    top: cssPixelValue(style, "--score-toolbar-height", 148),
+    right: cssPixelValue(style, "--score-paper-inset-right", 49),
+    bottom: cssPixelValue(style, "--score-paper-inset-bottom", 100),
+    left: cssPixelValue(style, "--score-paper-inset-left", 49),
   };
 }
 

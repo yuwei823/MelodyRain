@@ -735,11 +735,11 @@ select:focus-visible {
   border-radius: tokens.$card-radius;
   background: tokens.$color-paper;
   box-shadow: 0 28px 70px rgba(0, 0, 0, 0.38);
-  --score-toolbar-height: 78px;
+  --score-toolbar-height: 148px;
   --score-content-inset-top: 32px;
-  --score-paper-inset-right: 10px;
-  --score-paper-inset-bottom: 20px;
-  --score-paper-inset-left: 10px;
+  --score-paper-inset-right: 49px;
+  --score-paper-inset-bottom: 100px;
+  --score-paper-inset-left: 49px;
 }
 .frame-caption {
   width: min(100%, tokens.$stage-width);

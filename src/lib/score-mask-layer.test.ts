@@ -90,16 +90,24 @@ describe("score mask black mixing", () => {
 describe("score viewport layout", () => {
   it("reads the shared toolbar and paper inset variables", () => {
     const values = new Map([
-      ["--score-toolbar-height", "78px"],
-      ["--score-paper-inset-right", "10px"],
-      ["--score-paper-inset-bottom", "12px"],
-      ["--score-paper-inset-left", "14px"],
+      ["--score-toolbar-height", "148px"],
+      ["--score-paper-inset-right", "49px"],
+      ["--score-paper-inset-bottom", "100px"],
+      ["--score-paper-inset-left", "49px"],
     ]);
     const style = {
       getPropertyValue: (property: string) => values.get(property) ?? "",
     } as CSSStyleDeclaration;
 
-    expect(scoreViewportLayout(style)).toEqual({ top: 78, right: 10, bottom: 12, left: 14 });
+    expect(scoreViewportLayout(style)).toEqual({ top: 148, right: 49, bottom: 100, left: 49 });
+  });
+
+  it("falls back to the current design-token defaults when variables are missing", () => {
+    const style = {
+      getPropertyValue: (_property: string) => "",
+    } as CSSStyleDeclaration;
+
+    expect(scoreViewportLayout(style)).toEqual({ top: 148, right: 49, bottom: 100, left: 49 });
   });
 
   it("keeps nested score geometry relative to the viewport origin", () => {
