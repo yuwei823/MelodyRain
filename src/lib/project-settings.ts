@@ -8,7 +8,6 @@ export type ConnectedNoteMode = "together" | "expand";
 
 export interface NoteFrameEffectSettings {
   mixStrengthPercent: number;
-  transitionFrames: number;
   ranges: FrameColorRange[];
 }
 
@@ -116,7 +115,6 @@ export function parseProjectSettings(text: string): ProjectSettings {
     connectedNoteMode: value.connectedNoteMode,
     noteFrameEffect: {
       mixStrengthPercent: percent(noteFrameEffect.mixStrengthPercent, "noteFrameEffect.mixStrengthPercent"),
-      transitionFrames: percent(noteFrameEffect.transitionFrames, "noteFrameEffect.transitionFrames"),
       ranges: frameColorRanges(noteFrameEffect.ranges),
     },
   };

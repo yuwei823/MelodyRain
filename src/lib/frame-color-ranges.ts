@@ -109,13 +109,18 @@ export function resolveFrameColorConfig(
     ? 1
     : Math.min(1, (frame - boundary + 1) / transitionFrames);
   const previous = boundary === undefined ? current : styleAt(boundary - 1, globalConfig, ranges);
+  // Solid ranges render at the shared mix strength; rainbow ranges always
+  // render at full strength. Mode switches interpolate that strength across
+  // the transition as well, so the color intensity cannot jump at the
+  // boundary.
+  const strengthOf = (mode: FrameColorMode) => mode === "rainbow" ? 1 : globalConfig.mixAmount;
   if (previous.mode !== current.mode && progress >= 1) {
     return current.mode === "solid"
       ? { mode: "mask", mixColor: current.color, mixAmount: globalConfig.mixAmount }
       : {
         mode: "rainbow",
         mixColor: current.color,
-        mixAmount: globalConfig.mixAmount,
+        mixAmount: 1,
         palette: palette("rainbow", current.color),
       };
   }
@@ -133,10 +138,11 @@ export function resolveFrameColorConfig(
   const toPalette = palette(current.mode, current.color);
   const resolvedPalette = Object.fromEntries((Object.keys(toPalette) as PitchStep[])
     .map((step) => [step, mixHexColors(fromPalette[step], toPalette[step], progress)])) as Palette;
+  const previousStrength = strengthOf(previous.mode);
   return {
     mode: "rainbow",
     mixColor: current.color,
-    mixAmount: globalConfig.mixAmount,
+    mixAmount: previousStrength + (strengthOf(current.mode) - previousStrength) * progress,
     palette: resolvedPalette,
   };
 }

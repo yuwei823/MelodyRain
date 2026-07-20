@@ -16,7 +16,7 @@ import {
   type TitleColorMode,
 } from "../lib/title-color";
 import type { LoadedProject } from "./use-project-loader";
-import { DEFAULT_FRAME_COLOR_TRANSITION_FRAMES, type FrameColorRange } from "../lib/frame-color-ranges";
+import type { FrameColorRange } from "../lib/frame-color-ranges";
 import { videoExportFrameCount } from "../lib/video-export";
 
 const DEFAULT_BACKGROUND_COLOR = "#000000";
@@ -38,7 +38,6 @@ export function useProjectVisualSettings() {
   const [performanceMixColor, setPerformanceMixColor] = useState(DEFAULT_PERFORMANCE_MIX_COLOR);
   const [performanceMixPercent, setPerformanceMixPercent] = useState(DEFAULT_PERFORMANCE_MIX_PERCENT);
   const [connectedNoteMode, setConnectedNoteMode] = useState<ConnectedNoteMode>("together");
-  const [frameColorTransitionFrames, setFrameColorTransitionFrames] = useState(DEFAULT_FRAME_COLOR_TRANSITION_FRAMES);
   const [performanceColorRanges, setPerformanceColorRanges] = useState<FrameColorRange[]>([]);
   const [selectedBackgroundIndex, setSelectedBackgroundIndex] = useState(0);
   const [backgroundImageUrl, setBackgroundImageUrl] = useState<string | null>(null);
@@ -56,7 +55,6 @@ export function useProjectVisualSettings() {
     setPerformanceMixColor(DEFAULT_PERFORMANCE_MIX_COLOR);
     setPerformanceMixPercent(settings.noteFrameEffect.mixStrengthPercent);
     setConnectedNoteMode(settings.connectedNoteMode);
-    setFrameColorTransitionFrames(settings.noteFrameEffect.transitionFrames);
     setPerformanceColorRanges(settings.noteFrameEffect.ranges);
     const backgroundIndex = settings.backgroundImageFile
       ? projectBackgroundsRef.current.findIndex((file) => file.name === settings.backgroundImageFile)
@@ -91,7 +89,6 @@ export function useProjectVisualSettings() {
     setPerformanceMixColor(DEFAULT_PERFORMANCE_MIX_COLOR);
     setPerformanceMixPercent(DEFAULT_PERFORMANCE_MIX_PERCENT);
     setConnectedNoteMode("together");
-    setFrameColorTransitionFrames(DEFAULT_FRAME_COLOR_TRANSITION_FRAMES);
     setPerformanceColorRanges([{
       id: "default-full-range",
       startFrame: 0,
@@ -153,12 +150,11 @@ export function useProjectVisualSettings() {
     connectedNoteMode,
     noteFrameEffect: {
       mixStrengthPercent: performanceMixPercent,
-      transitionFrames: frameColorTransitionFrames,
       ranges: performanceColorRanges,
     },
   }), [backgroundColor, backgroundMode, customTitle, maskBlackMixPercent, measuresPerSystem,
     paperTransparencyPercent, performanceMixPercent,
-    selectedBackgroundFile, titleColor, titleColorMode, connectedNoteMode, frameColorTransitionFrames,
+    selectedBackgroundFile, titleColor, titleColorMode, connectedNoteMode,
     performanceColorRanges]);
 
   return {
@@ -169,7 +165,6 @@ export function useProjectVisualSettings() {
     setPerformanceMixColor, performanceMixPercent, setPerformanceMixPercent, selectedBackgroundIndex,
     setSelectedBackgroundIndex, maskSource, performanceEffectConfig, currentProjectSettings,
     connectedNoteMode, setConnectedNoteMode,
-    frameColorTransitionFrames, setFrameColorTransitionFrames,
     performanceColorRanges, setPerformanceColorRanges,
     applyProjectSettings, adoptProjectSettings,
   };

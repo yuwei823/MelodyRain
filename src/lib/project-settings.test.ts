@@ -23,7 +23,6 @@ const SETTINGS: ProjectSettings = {
   connectedNoteMode: "expand",
   noteFrameEffect: {
     mixStrengthPercent: 62,
-    transitionFrames: 15,
     ranges: [{ id: "default", startFrame: 0, endFrame: 1_000, mode: "solid", color: "#A11CE9" }],
   },
 };
@@ -72,7 +71,6 @@ describe("project settings", () => {
 
     expect(sample.version).toBe(PROJECT_SETTINGS_VERSION);
     expect(sample.noteFrameEffect.mixStrengthPercent).toBeGreaterThanOrEqual(0);
-    expect(sample.noteFrameEffect.transitionFrames).toBeGreaterThanOrEqual(0);
     expect(sample.noteFrameEffect.ranges.length).toBeGreaterThan(0);
     expect(sample.noteFrameEffect.ranges[0]?.startFrame).toBe(0);
   });

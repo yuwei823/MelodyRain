@@ -31,7 +31,9 @@ MelodyRain 是一个本地优先的五线谱演奏动画工具：读取 MusicXML
   - `rain-layer.ts` — 音符/休止符下落动画，MIDI 事件 ↔ SVG 落点匹配
   - `performance-effect-layer.ts` — 演奏元素的蒙版/彩虹着色（fixed 背景源）
   - `score-mask-layer.ts` / `score-timeline-layer.ts` — 谱面蒙版、时间线揭示
-  - `frame-color-ranges.ts` — 帧范围着色与过渡计算
+  - `frame-color-ranges.ts` — 帧范围着色与过渡计算；过渡也覆盖 solid↔rainbow 模式切换
+    （经彩虹渲染器从上一样式调色板插值，混入强度同步在 mixAmount↔1 间插值，彩虹侧经
+    fill-opacity/stroke-opacity 生效），过渡时长固定用 `DEFAULT_FRAME_COLOR_TRANSITION_FRAMES = 60`（设置文件不再保存该字段）
   - `video-export.ts` — **前后端共享**的导出常量与帧数公式（见"常见坑"）
   - `project-settings.ts` — `melody-rain.settings.json` 的序列化/校验
   - `render-profile.ts` — 竖屏渲染 profile（1080×1920，fps 必须与导出一致）
@@ -83,6 +85,9 @@ MelodyRain 是一个本地优先的五线谱演奏动画工具：读取 MusicXML
 - **双语 UI**：界面文案惯例为 `English / 中文` 形式。
 - **FFmpeg/Chrome 依赖**：导出需要系统 PATH 里有 `ffmpeg`，以及本机 Chrome 或 Edge
   （可用 `MELODY_RAIN_CHROME` 环境变量指定路径）。
+- **蒙版克隆重建**：`PerformanceEffectLayer.rebuildMaskClones()` 在克隆源元素前必须临时摘掉 viewport 的
+  `performance-mask-mode` class（该 class 强制源元素 paint 透明，带着它克隆会把叶子烘焙成
+  `fill:none`，整个音符蒙版变空）。重建发生在 `setVisuals`（如连音符模式切换）和 resize 时。
 - **promise 纪律**：服务端凡是可能被取消/中途失败的进程 promise（如 waitForProcess），
   创建时必须保证不会 unhandled rejection，否则整个本地服务进程会崩溃。
 

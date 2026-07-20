@@ -65,8 +65,12 @@ interface OriginalPaintStyle {
   element: SVGGraphicsElement;
   fill: string;
   fillPriority: string;
+  fillOpacity: string;
+  fillOpacityPriority: string;
   stroke: string;
   strokePriority: string;
+  strokeOpacity: string;
+  strokeOpacityPriority: string;
   color: string;
   colorPriority: string;
 }
@@ -346,8 +350,15 @@ export class PerformanceEffectLayer {
       leaf.style.setProperty("color", resolvedPaint.kind === "solid"
         ? resolvedPaint.color
         : this.config.palette?.G ?? PERFORMANCE_RAINBOW_PALETTE.G, "important");
-      if (hasVisiblePaint(style.fill, style.fillOpacity)) leaf.style.setProperty("fill", value, "important");
-      if (hasVisiblePaint(style.stroke, style.strokeOpacity)) leaf.style.setProperty("stroke", value, "important");
+      const strength = String(this.config.mixAmount);
+      if (hasVisiblePaint(style.fill, style.fillOpacity)) {
+        leaf.style.setProperty("fill", value, "important");
+        leaf.style.setProperty("fill-opacity", strength, "important");
+      }
+      if (hasVisiblePaint(style.stroke, style.strokeOpacity)) {
+        leaf.style.setProperty("stroke", value, "important");
+        leaf.style.setProperty("stroke-opacity", strength, "important");
+      }
     });
   }
 
@@ -357,8 +368,12 @@ export class PerformanceEffectLayer {
       element,
       fill: element.style.getPropertyValue("fill"),
       fillPriority: element.style.getPropertyPriority("fill"),
+      fillOpacity: element.style.getPropertyValue("fill-opacity"),
+      fillOpacityPriority: element.style.getPropertyPriority("fill-opacity"),
       stroke: element.style.getPropertyValue("stroke"),
       strokePriority: element.style.getPropertyPriority("stroke"),
+      strokeOpacity: element.style.getPropertyValue("stroke-opacity"),
+      strokeOpacityPriority: element.style.getPropertyPriority("stroke-opacity"),
       color: element.style.getPropertyValue("color"),
       colorPriority: element.style.getPropertyPriority("color"),
     });
@@ -369,13 +384,17 @@ export class PerformanceEffectLayer {
       cancelAnimationFrame(this.rainbowPreparationFrame);
       this.rainbowPreparationFrame = null;
     }
-    this.originals.forEach(({ element, fill, fillPriority, stroke, strokePriority, color, colorPriority }) => {
-      if (fill) element.style.setProperty("fill", fill, fillPriority);
-      else element.style.removeProperty("fill");
-      if (stroke) element.style.setProperty("stroke", stroke, strokePriority);
-      else element.style.removeProperty("stroke");
-      if (color) element.style.setProperty("color", color, colorPriority);
-      else element.style.removeProperty("color");
+    this.originals.forEach((original) => {
+      const { element } = original;
+      const restore = (property: string, value: string, priority: string) => {
+        if (value) element.style.setProperty(property, value, priority);
+        else element.style.removeProperty(property);
+      };
+      restore("fill", original.fill, original.fillPriority);
+      restore("fill-opacity", original.fillOpacity, original.fillOpacityPriority);
+      restore("stroke", original.stroke, original.strokePriority);
+      restore("stroke-opacity", original.strokeOpacity, original.strokeOpacityPriority);
+      restore("color", original.color, original.colorPriority);
     });
     this.originals.clear();
     this.gradientDefs.forEach((defs) => defs.remove());

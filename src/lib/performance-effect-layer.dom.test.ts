@@ -87,10 +87,12 @@ describe("PerformanceEffectLayer mode isolation", () => {
     frames.delete(frameId);
     callback(performance.now());
     expect(note.style.getPropertyValue("fill")).toBe("rgb(240, 93, 108)");
+    expect(note.style.getPropertyValue("fill-opacity")).toBe("0.35");
 
     layer.setConfig({ mode: "mask", mixColor: "#1CAEE8", mixAmount: 0.35 });
     expect(note.style.fill).toBe("black");
     expect(note.style.getPropertyPriority("fill")).toBe("");
+    expect(note.style.getPropertyValue("fill-opacity")).toBe("");
     expect(note.classList.contains("performance-mask-source")).toBe(true);
 
     layer.dispose();

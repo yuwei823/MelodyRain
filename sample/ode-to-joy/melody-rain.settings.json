@@ -12,7 +12,6 @@
   "connectedNoteMode": "together",
   "noteFrameEffect": {
     "mixStrengthPercent": 61,
-    "transitionFrames": 60,
     "ranges": [
       {
         "id": "8004c410-d04b-4bc6-93f2-65e6575d7789",
