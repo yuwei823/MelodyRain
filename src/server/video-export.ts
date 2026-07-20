@@ -193,12 +193,12 @@ function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promi
 }
 
 export async function runExportJob(job: ExportJob, appUrl: string): Promise<void> {
-  const audio = job.assets.find((asset) => asset.field === "audio");
-  if (!audio) throw new Error("Audio file missing / 缺少音频文件");
   // Kept outside the try so the catch path can always settle it: a rejected
   // waitForProcess promise without a handler would crash the server process.
   let ffmpegDone: Promise<Error | null> | null = null;
   try {
+    const audio = job.assets.find((asset) => asset.field === "audio");
+    if (!audio) throw new Error("Audio file missing / 缺少音频文件");
     job.phase = "rendering";
     const browser = await chromium.launch({
       executablePath: chromeExecutable(),

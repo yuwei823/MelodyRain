@@ -106,7 +106,11 @@ app.post("/api/export/jobs", upload.any(), async (request, response) => {
     // comes from the Vite server (live code), while this host may serve a
     // stale dist/ build. The origin is validated against the CORS allowlist
     // so the headless browser cannot be redirected to an arbitrary URL.
-    void runExportJob(job, appUrl).finally(() => { activeExportJobs -= 1; });
+    void runExportJob(job, appUrl)
+      .catch((error: unknown) => {
+        console.error("Export job failed unexpectedly / 导出任务意外失败:", error instanceof Error ? error.message : String(error));
+      })
+      .finally(() => { activeExportJobs -= 1; });
   } catch (error) {
     response.status(500).json({ code: "EXPORT_CREATE_FAILED", message: error instanceof Error ? error.message : String(error) });
   }
