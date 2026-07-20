@@ -4,7 +4,6 @@ export type TransportState = "idle" | "playing" | "paused" | "ended";
 
 export interface TransportSnapshot {
   state: TransportState;
-  presentationTimeMs: number;
   sourceTimeMs: number;
   durationMs: number;
   scoreQuarter: number;
@@ -33,7 +32,6 @@ export function transportSnapshotAt(
   const tempo = timeline.tempoAt(sourceTimeMs);
   return {
     state,
-    presentationTimeMs: sourceTimeMs / safeScale,
     sourceTimeMs,
     durationMs,
     scoreQuarter: timeline.scoreQuarterAt(sourceTimeMs),
@@ -99,12 +97,16 @@ export class MediaTransport {
   }
 
   seek(progress: number): void {
+    if (this.preparingPreRoll) return;
     if (this.preRollTimeMs !== null) {
       this.cancelPreRoll();
       this.state = progress > 0 ? "paused" : "idle";
     }
     const duration = Number.isFinite(this.audio.duration) ? this.audio.duration : 0;
     this.audio.currentTime = Math.max(0, Math.min(1, progress)) * duration;
+    if (this.audio.currentTime === 0) {
+      this.state = "idle";
+    }
     this.emit();
   }
 

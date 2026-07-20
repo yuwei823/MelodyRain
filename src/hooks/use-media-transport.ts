@@ -4,9 +4,9 @@ import { MediaTransport, TRANSPORT_PRE_ROLL_MS, type TransportSnapshot } from ".
 import type { LoadedProject } from "./use-project-loader";
 
 const EMPTY_SNAPSHOT: TransportSnapshot = {
-  state: "idle", presentationTimeMs: -TRANSPORT_PRE_ROLL_MS - 1,
-  sourceTimeMs: -TRANSPORT_PRE_ROLL_MS - 1, durationMs: 0, scoreQuarter: 0,
-  tempoScale: 1, effectiveBpm: 120, progress: 0, activeNoteIds: [],
+  state: "idle", sourceTimeMs: -TRANSPORT_PRE_ROLL_MS - 1, durationMs: 0,
+  scoreQuarter: 0, tempoScale: 1, effectiveBpm: 120, progress: 0,
+  activeNoteIds: [],
 };
 const PLAYING_UI_REFRESH_INTERVAL_MS = 50;
 
