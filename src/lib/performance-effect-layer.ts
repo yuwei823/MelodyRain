@@ -524,9 +524,15 @@ export class PerformanceEffectLayer {
   private rebuildMaskClones(): void {
     const maskedSources = this.maskSources.filter((source) => source.classList.contains("performance-mask-source"));
     maskedSources.forEach((source) => source.classList.remove("performance-mask-source"));
+    // Mask mode forces the source paint transparent through the viewport
+    // class; cloning under it would bake fill:none leaves and blank the mask
+    // (e.g. after a connected-note mode switch or a resize rebuild).
+    const hadMaskMode = this.viewport.classList.contains("performance-mask-mode");
+    if (hadMaskMode) this.viewport.classList.remove("performance-mask-mode");
     this.maskClones = this.maskSources.map((source) => this.createMaskClone(source));
     this.maskGeometry.replaceChildren(...this.maskClones.map(({ container }) => container));
     maskedSources.forEach((source) => source.classList.add("performance-mask-source"));
+    if (hadMaskMode) this.viewport.classList.add("performance-mask-mode");
   }
 
   private resize(): boolean {

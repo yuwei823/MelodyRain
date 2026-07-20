@@ -95,4 +95,51 @@ describe("PerformanceEffectLayer mode isolation", () => {
 
     layer.dispose();
   });
+
+  it("keeps mask clones white when visuals are rebuilt while mask mode is active", () => {
+    // The app's stylesheet hides source paint under mask mode; rebuilding the
+    // clones (connected-note mode switch, resize) must not bake that
+    // transparency into the alpha mask.
+    const style = document.createElement("style");
+    style.textContent = ".score-viewport.performance-mask-mode .rain-score-symbol {"
+      + " fill: transparent !important; stroke: transparent !important; }";
+    document.head.append(style);
+
+    const frame = document.createElement("div");
+    const viewport = document.createElement("div");
+    viewport.classList.add("score-viewport");
+    Object.defineProperties(viewport, {
+      clientWidth: { configurable: true, value: 800 },
+      clientHeight: { configurable: true, value: 600 },
+    });
+    frame.getBoundingClientRect = () => bounds(800, 600);
+    viewport.getBoundingClientRect = () => bounds(800, 600);
+    viewport.append(frame);
+    document.body.append(viewport);
+
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    const note = document.createElementNS("http://www.w3.org/2000/svg", "path") as SVGGraphicsElement;
+    note.classList.add("rain-score-symbol");
+    note.style.fill = "black";
+    note.getBoundingClientRect = () => bounds(12, 8);
+    Object.defineProperty(note, "getScreenCTM", { configurable: true, value: () => null });
+    svg.append(note);
+    frame.append(svg);
+
+    const cloneLeaf = () => viewport
+      .querySelector(".performance-mask-layer mask > g")!
+      .firstElementChild!.firstElementChild as SVGGraphicsElement;
+
+    const layer = new PerformanceEffectLayer(frame, viewport);
+    layer.setVisuals({ maskElements: [note], paints: [] });
+    expect(cloneLeaf().style.getPropertyValue("fill")).toBe("white");
+
+    // Second rebuild while mask mode is already active (the connected-note
+    // fast path does exactly this via rainLayer.setEvents + setVisuals).
+    layer.setVisuals({ maskElements: [note], paints: [] });
+    expect(cloneLeaf().style.getPropertyValue("fill")).toBe("white");
+
+    layer.dispose();
+    style.remove();
+  });
 });
