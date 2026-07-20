@@ -18,18 +18,18 @@ describe("score-system-following vertical camera", () => {
   });
 
   it("centers the active row and remains stable while that row is playing", () => {
-    expect(systemFollowingCameraOffset(anchors, 8.5, 800, 2_000)).toBe(100);
-    expect(systemFollowingCameraOffset(anchors, 12, 800, 2_000)).toBe(100);
+    expect(systemFollowingCameraOffset(anchors, 11, 800, 2_000)).toBe(100);
+    expect(systemFollowingCameraOffset(anchors, 15.9, 800, 2_000)).toBe(100);
   });
 
   it("smoothly transitions after the active row changes", () => {
     expect(systemFollowingCameraOffset(anchors, 16, 800, 2_000)).toBe(100);
-    expect(systemFollowingCameraOffset(anchors, 16.25, 800, 2_000)).toBe(300);
-    expect(systemFollowingCameraOffset(anchors, 16.5, 800, 2_000)).toBe(500);
+    expect(systemFollowingCameraOffset(anchors, 17, 800, 2_000)).toBe(300);
+    expect(systemFollowingCameraOffset(anchors, 18, 800, 2_000)).toBe(500);
   });
 
   it("stops early when the complete score bottom is visible", () => {
-    expect(systemFollowingCameraOffset(anchors, 24.5, 800, 1_600)).toBe(800);
+    expect(systemFollowingCameraOffset(anchors, 27, 800, 1_600)).toBe(800);
     expect(systemFollowingCameraOffset(anchors, 30, 800, 1_600)).toBe(800);
   });
 
