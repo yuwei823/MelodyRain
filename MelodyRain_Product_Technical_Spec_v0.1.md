@@ -1013,7 +1013,6 @@ interface TempoSegment {
 
 interface TransportSnapshot {
   state: "idle" | "playing" | "paused" | "ended";
-  presentationTimeMs: number;
   sourceTimeMs: number;
   scoreQuarter: number;
   tempoScale: number;
@@ -1026,6 +1025,8 @@ interface TransportSnapshot {
 ```
 
 `TempoSegment` 必须覆盖常速、离散 tempo 标记、渐快/渐慢及显式停顿；不得只保存单个“全曲 BPM”。`TransportSnapshot` 是一帧内所有消费者共享的不可变快照。消费者不得在读取快照后自行累加时间。首音符静音预卷期间 `sourceTimeMs` 和 `presentationTimeMs` 允许为负数，`state` 为 `playing`，`activeTimelineEventIds` 必须为空，进度条显示值钳制为 `0`；视觉层必须使用负时间快照计算首音符的下落位置，不得把负时间提前钳制为 `0`。
+
+首音符静音预卷期间 `sourceTimeMs` 允许为负数，`state` 为 `playing`，`activeTimelineEventIds` 必须为空，进度条显示值钳制为 `0`；视觉层必须使用负时间快照计算首音符的下落位置，不得把负时间提前钳制为 `0`。`TransportSnapshot` 不再包含 `presentationTimeMs`，消费者需要 presentation 时间时自行按 `sourceTimeMs + TRANSPORT_PRE_ROLL_MS` 计算。
 
 所有毫秒值使用整数；内部解析可使用有理数或高精度数值，最终只在生成时间轴时取整。
 
@@ -1290,8 +1291,8 @@ MVP 至少维护以下自有或可合法再分发的固定测试谱：
 - 已实现音符/和弦/休止符下落与命中、部分跨音符连接和谱面说明元素的时间效果、静态谱面背景蒙版，以及共享蒙版和彩虹两种演奏元素效果。
 - 支持标题及自动/自定义标题颜色、背景图片/纯色、蒙版黑色混入、谱纸透明度、演奏元素混色，并可保存和读取项目设置。
 - 本地 Express 服务监听 `127.0.0.1:4174`，提供静态网页、健康检查、演示资源和视频导出任务 API。
-- 已实现 Playwright/Chrome 确定性逐帧渲染与 FFmpeg PNG pipe 编码；普通档输出 540×960、30 FPS 并使用 `veryfast`/CRF 22，高清档输出 1080×1920、30 FPS 并使用 `medium`/CRF 18；两档均为 H.264/AAC MP4，支持进度、取消和任务清理。
-- 预览区显示与导出一致的绝对帧号；第 0 帧为 1.2 秒预卷起点，第 36 帧对应乐曲源时间 0。导出卡片支持半开区间 `[startFrame, endFrame)`，服务端直接从绝对时间重建所选帧，并同步调整 MP3 的延迟或截取起点。
+- 已实现 Playwright/Chrome 确定性逐帧渲染与 FFmpeg PNG pipe 编码；普通档输出 540×960、30 FPS 并使用 `veryfast`/CRF 22，高清档输出 1080×1920、30 FPS 并使用 `medium`/CRF 18；两档均为 H.264/AAC MP4，支持进度、取消和任务清理。服务端对导出任务 API 强制校验 Origin 头，并限制最大并发任务数。
+- 预览区显示与导出一致的绝对帧号；第 0 帧为 1.2 秒预卷起点，第 36 帧对应乐曲源时间 0。导出卡片支持半开区间 `[startFrame, endFrame)`，服务端直接从绝对时间重建所选帧；音频同步通过在音频流开头填充真实静音（FFmpeg `adelay` 滤镜）实现，避免依赖手机播放器经常忽略的 MP4 edit list。若页面加载后没有音符落点，会立即通过 `dataset.exportError` 失败，不再等待 60 秒超时。
 - 导出文件默认使用画面标题命名；有目录写权限时写入素材文件夹，否则回退到浏览器下载，并在完成后弹窗通知。
 - 当前样例的真实端到端验证已成功导出 908 帧、约 30 秒的成品；测试机器耗时约 11 分钟，逐帧浏览器截图仍是主要性能瓶颈。
 

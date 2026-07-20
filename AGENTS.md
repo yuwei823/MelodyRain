@@ -77,7 +77,10 @@ MelodyRain 是一个本地优先的五线谱演奏动画工具：读取 MusicXML
   其相对 import 必须带 `.js` 扩展名（如 `transport.ts` 里 `from "./midi.js"`）。
 - **共享常量**：预滚/帧率/帧数公式只维护一份，在 `src/lib/video-export.ts`
   （`VIDEO_EXPORT_FPS`、`VIDEO_EXPORT_PRE_ROLL_MS`、`videoExportFullFrameCount`），
-  服务端经 `../lib/video-export.js` 引用。改帧率必须同时考虑 `render-profile.ts` 的展示值。
+  服务端经 `../lib/video-export.js` 引用；`render-profile.ts` 的 `fps` 也直接派生自 `VIDEO_EXPORT_FPS`，
+  改帧率只需改这一处。
+- **导出音频对齐**：服务端用 FFmpeg `adelay` 滤镜在音频流开头填充真实静音，以保证第 36 帧对齐
+  乐曲时间 0。不要再用 `-itsoffset`，它产生的 MP4 edit list 在很多手机播放器上会被忽略，导致音画不同步。
 - **导出渲染来源**：导出页 URL 取请求的 Origin——dev 下是 Vite（实时代码），生产下是 4174 的 dist/。
   因此**生产模式改代码后必须 `npm run build`**，否则导出视频用的还是旧 bundle。
 - **编码**：部分源文件含历史乱码的中英双语文案（UTF-8 但内容是早期双重编码残留）。
@@ -90,6 +93,9 @@ MelodyRain 是一个本地优先的五线谱演奏动画工具：读取 MusicXML
   `fill:none`，整个音符蒙版变空）。重建发生在 `setVisuals`（如连音符模式切换）和 resize 时。
 - **promise 纪律**：服务端凡是可能被取消/中途失败的进程 promise（如 waitForProcess），
   创建时必须保证不会 unhandled rejection，否则整个本地服务进程会崩溃。
+- **导出安全与并发**：`/api/export/jobs` 强制校验 Origin 头，非本地地址直接拒绝；同一时刻最多允许
+  `MAX_CONCURRENT_EXPORT_JOBS`（当前 2）个任务并行，超限返回 503。单帧渲染/截图有 30 秒看门狗，
+  0 个音符落点时会通过 `dataset.exportError` 立即失败，不再等到 60 秒 exportReady 超时。
 
 ## 测试约定
 

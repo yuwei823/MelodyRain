@@ -33,7 +33,8 @@ The local Express service creates an export job. Playwright drives an installed 
 - High quality outputs `1080 × 1920` at 30 FPS;
 - Full-song export remains the default, while an optional half-open frame range includes the start frame and excludes the end frame; frame numbers include the 1.2-second entrance pre-roll, so frame 36 is source time zero;
 - Full-score export with a 1.2-second falling-note pre-roll;
-- Progress, cancellation, and error reporting;
+- Progress, cancellation, and error reporting; the server enforces a concurrency limit and validates the Origin header;
+- Audio sync uses the FFmpeg `adelay` filter to pad real silence, avoiding A/V drift on mobile players that ignore the MP4 edit list;
 - The current display title is the default filename, with Windows-invalid filename characters replaced automatically;
 - The result is written directly to the authorized asset folder when possible, with browser download as a fallback;
 - A completion dialog reports the filename and save method.
