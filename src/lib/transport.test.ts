@@ -21,8 +21,14 @@ class FakeAudio extends EventTarget {
   duration = 10;
   playbackRate = 1;
   muted = false;
+  playShouldFail = false;
+  playCount = 0;
 
   async play(): Promise<void> {
+    this.playCount += 1;
+    if (this.playShouldFail) {
+      throw new Error("NotAllowedError");
+    }
     this.paused = false;
     this.dispatchEvent(new Event("play"));
   }
@@ -54,6 +60,44 @@ describe("transport pre-roll", () => {
   it("respects the selected playback rate", () => {
     expect(preRollSourceTime(1_200, 0.5)).toBe(-600);
     expect(preRollSourceTime(600, 2)).toBe(0);
+  });
+});
+
+describe("transport toggle", () => {
+  it("ignores repeated toggle clicks while pre-roll is being prepared", async () => {
+    vi.stubGlobal("requestAnimationFrame", () => 1);
+    vi.stubGlobal("cancelAnimationFrame", () => undefined);
+    try {
+      const audio = new FakeAudio();
+      audio.currentTime = 0;
+      const transport = new MediaTransport(audio as unknown as HTMLAudioElement, new MidiTimeline(EMPTY_MIDI));
+
+      const toggles = [transport.toggle(), transport.toggle(), transport.toggle()];
+      await Promise.all(toggles);
+
+      expect(audio.playCount).toBe(1);
+      transport.dispose();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("returns to idle when pre-roll unlock fails", async () => {
+    const audio = new FakeAudio();
+    audio.currentTime = 0;
+    audio.playShouldFail = true;
+    const transport = new MediaTransport(audio as unknown as HTMLAudioElement, new MidiTimeline(EMPTY_MIDI));
+
+    let lastState = "";
+    transport.subscribe((snapshot) => {
+      lastState = snapshot.state;
+    });
+
+    await transport.toggle();
+
+    expect(lastState).toBe("idle");
+    expect(audio.muted).toBe(false);
+    transport.dispose();
   });
 });
 

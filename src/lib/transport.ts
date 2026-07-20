@@ -73,10 +73,12 @@ export class MediaTransport {
   }
 
   async toggle(): Promise<void> {
-    if (this.preRollTimeMs !== null) {
-      this.cancelPreRoll();
-      this.state = "idle";
-      this.emit();
+    if (this.preparingPreRoll || this.preRollTimeMs !== null) {
+      if (this.preRollTimeMs !== null) {
+        this.cancelPreRoll();
+        this.state = "idle";
+        this.emit();
+      }
       return;
     }
     if (this.audio.paused) {
@@ -178,6 +180,11 @@ export class MediaTransport {
       await this.audio.play();
       this.audio.pause();
       this.audio.currentTime = 0;
+    } catch {
+      // Unlock failed (e.g. no user activation). Reset so the UI can retry.
+      this.state = "idle";
+      this.emit();
+      return;
     } finally {
       this.audio.muted = wasMuted;
       this.preparingPreRoll = false;
