@@ -55,6 +55,7 @@ export function useProjectLoader({ onProjectLoaded, onSettingsLoaded }: UseProje
   const directoryHandleRef = useRef<RememberedDirectoryHandle | null>(null);
   const loadRequestRef = useRef(0);
   const initialLoadStartedRef = useRef(false);
+  const userSelectedRef = useRef(false);
   const remembersFolders = canRememberFolder();
 
   const adoptProject = useCallback((nextProject: LoadedProject) => {
@@ -135,6 +136,7 @@ export function useProjectLoader({ onProjectLoaded, onSettingsLoaded }: UseProje
   }, [loadLocalFiles]);
 
   const selectAssetFolder = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    userSelectedRef.current = true;
     const files = event.target.files;
     directoryHandleRef.current = null;
     setFolderName(files?.[0]?.webkitRelativePath.split("/")[0] ?? null);
@@ -210,7 +212,7 @@ export function useProjectLoader({ onProjectLoaded, onSettingsLoaded }: UseProje
   }, [selectAssetFolderFromFiles]);
 
   useEffect(() => {
-    if (initialLoadStartedRef.current) return;
+    if (initialLoadStartedRef.current || userSelectedRef.current) return;
     initialLoadStartedRef.current = true;
     if (new URLSearchParams(window.location.search).has("exportJob")) return;
     void (async () => {
@@ -220,6 +222,7 @@ export function useProjectLoader({ onProjectLoaded, onSettingsLoaded }: UseProje
   }, [loadBundledSample, loadRememberedFolder, remembersFolders]);
 
   const chooseAndLoadAssetFolder = useCallback(async () => {
+    userSelectedRef.current = true;
     if (!remembersFolders) {
       folderInputRef.current?.click();
       return;
