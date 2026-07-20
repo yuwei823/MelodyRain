@@ -43,6 +43,21 @@ Development exports require `npm run dev`, which starts both Vite and the local 
 
 When no project settings file is loaded, the visual defaults are `40%` score-mask black mixing, `10%` paper transparency, and `50%` performance-mask color mixing.
 
+## Recommended color palette
+
+These colors work well for solid backgrounds, title text, and rainbow performance elements:
+
+| Color | HEX | HSL |
+| - | - | - |
+| Red 赤 | **#E84A4A** | 0°, 80%, 52% |
+| Orange 橙 | **#E88A2A** | 30°, 82%, 54% |
+| Yellow 黄 | **#E8C420** | 48°, 78%, 52% |
+| Green 绿 | **#50C850** | 120°, 75%, 55% |
+| Cyan 青 | **#1CAEE8** | 197°, 82%, 51% |
+| Blue 蓝 | **#2A7AE8** | 220°, 80%, 53% |
+| Violet 紫 | **#8A4AE8** | 270°, 78%, 60% |
+| Pink 粉 | **#E84AA0** | 330°, 78%, 60% |
+
 ## Requirements
 
 - Node.js `>=20.19 <27`
