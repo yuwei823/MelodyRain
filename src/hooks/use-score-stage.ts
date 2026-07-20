@@ -113,7 +113,13 @@ export function useScoreStage(options: ScoreStageOptions) {
           const effectLayer = new PerformanceEffectLayer(viewport, viewport);
           effectLayer.setVisuals(mergePerformanceVisuals(rainLayer.performanceVisuals(), timelineLayer.performanceVisuals()));
           effectLayer.setSource(maskSourceRef.current);
-          effectLayer.setConfig(performanceEffectConfigRef.current);
+          const totalFrames = videoExportFrameCount(project.midi.durationMs);
+          const frame = videoExportCurrentFrame(timeMs, totalFrames);
+          effectLayer.setConfig(resolveFrameColorConfig(
+            frame,
+            performanceEffectConfigRef.current,
+            frameColorRangeSettingsRef.current,
+          ));
           effectLayer.update();
           performanceEffectLayerRef.current = effectLayer;
           const maskLayer = new ScoreMaskLayer(viewport, host);
