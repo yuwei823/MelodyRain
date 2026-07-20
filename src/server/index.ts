@@ -27,6 +27,8 @@ const exportRoot = path.join(os.tmpdir(), "melody-rain-exports");
 const uploadRoot = path.join(exportRoot, "uploads");
 mkdirSync(uploadRoot, { recursive: true });
 const upload = multer({ dest: uploadRoot, limits: { fileSize: 100 * 1024 * 1024, files: 16 } });
+const MAX_CONCURRENT_EXPORT_JOBS = 2;
+let activeExportJobs = 0;
 void cleanupStaleExportJobs(exportRoot);
 
 const demoAssets = {
@@ -87,17 +89,24 @@ app.post("/api/export/jobs", upload.any(), async (request, response) => {
       response.status(400).json({ code: "EXPORT_FRAME_RANGE_INVALID" });
       return;
     }
+    const requestOrigin = request.get("origin");
+    if (requestOrigin && !LOCAL_ORIGIN.test(requestOrigin)) {
+      response.status(403).json({ code: "EXPORT_ORIGIN_DENIED" });
+      return;
+    }
+    const appUrl = requestOrigin || `http://${host}:${port}`;
+    if (activeExportJobs >= MAX_CONCURRENT_EXPORT_JOBS) {
+      response.status(503).json({ code: "EXPORT_CONCURRENCY_LIMIT" });
+      return;
+    }
     const job = await createExportJob(exportRoot, files, quality, { startFrame, endFrame });
+    activeExportJobs += 1;
     response.status(202).json(exportJobStatus(job));
     // Render the export from the same origin the user is on: in dev the page
     // comes from the Vite server (live code), while this host may serve a
     // stale dist/ build. The origin is validated against the CORS allowlist
     // so the headless browser cannot be redirected to an arbitrary URL.
-    const requestOrigin = request.get("origin");
-    const appUrl = requestOrigin && LOCAL_ORIGIN.test(requestOrigin)
-      ? requestOrigin
-      : `http://${host}:${port}`;
-    void runExportJob(job, appUrl);
+    void runExportJob(job, appUrl).finally(() => { activeExportJobs -= 1; });
   } catch (error) {
     response.status(500).json({ code: "EXPORT_CREATE_FAILED", message: error instanceof Error ? error.message : String(error) });
   }
