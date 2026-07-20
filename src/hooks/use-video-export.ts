@@ -124,7 +124,7 @@ export function useVideoExport(options: UseVideoExportOptions) {
       window.alert(savedToFolder
         ? `Export completed and saved to the media folder: ${completedFileName} / 导出完成，已保存到素材文件夹：${completedFileName}`
         : `Export completed and downloaded: ${completedFileName} / 导出完成，文件已下载：${completedFileName}`);
-      void fetch(`/api/export/jobs/${status.id}`, { method: "DELETE" });
+      void fetch(`/api/export/jobs/${status.id}`, { method: "DELETE" }).catch(() => undefined);
     } catch (caught) {
       if (controller.signal.aborted) {
         setPhase("cancelled");
@@ -141,7 +141,7 @@ export function useVideoExport(options: UseVideoExportOptions) {
   const cancel = useCallback(() => {
     const jobId = jobIdRef.current;
     controllerRef.current?.abort();
-    if (jobId) void fetch(`/api/export/jobs/${jobId}`, { method: "DELETE" });
+    if (jobId) void fetch(`/api/export/jobs/${jobId}`, { method: "DELETE" }).catch(() => undefined);
   }, []);
 
   const active = phase === "preparing" || phase === "rendering" || phase === "finalizing";
