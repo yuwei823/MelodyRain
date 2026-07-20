@@ -39,9 +39,10 @@ const demoAssets = {
 
 const app = express();
 app.disable("x-powered-by");
+const LOCAL_ORIGIN = /^http:\/\/(127\.0\.0\.1|localhost):\d+$/;
 app.use(
   cors({
-    origin: [/^http:\/\/127\.0\.0\.1:\d+$/, /^http:\/\/localhost:\d+$/],
+    origin: (origin, callback) => callback(null, !origin || LOCAL_ORIGIN.test(origin)),
   }),
 );
 
@@ -88,7 +89,14 @@ app.post("/api/export/jobs", upload.any(), async (request, response) => {
     }
     const job = await createExportJob(exportRoot, files, quality, { startFrame, endFrame });
     response.status(202).json(exportJobStatus(job));
-    const appUrl = `http://${host}:${port}`;
+    // Render the export from the same origin the user is on: in dev the page
+    // comes from the Vite server (live code), while this host may serve a
+    // stale dist/ build. The origin is validated against the CORS allowlist
+    // so the headless browser cannot be redirected to an arbitrary URL.
+    const requestOrigin = request.get("origin");
+    const appUrl = requestOrigin && LOCAL_ORIGIN.test(requestOrigin)
+      ? requestOrigin
+      : `http://${host}:${port}`;
     void runExportJob(job, appUrl);
   } catch (error) {
     response.status(500).json({ code: "EXPORT_CREATE_FAILED", message: error instanceof Error ? error.message : String(error) });

@@ -34,6 +34,13 @@
         "endFrame": 661,
         "mode": "solid",
         "color": "#D50DFD"
+      },
+      {
+        "id": "41a30bb2-4204-45c2-8485-cd1701424d75",
+        "startFrame": 661,
+        "endFrame": 888,
+        "mode": "solid",
+        "color": "#44E817"
       }
     ]
   }

@@ -16,7 +16,7 @@ interface WorkingSystem extends ScoreSystem {
   lastX: number;
 }
 
-export const SCORE_SYSTEM_TRANSITION_QUARTERS = 0.5;
+export const SCORE_SYSTEM_TRANSITION_QUARTERS = 2;
 
 function scoreSystems(anchors: VerticalCameraAnchor[]): ScoreSystem[] {
   const columns = new Map<number, VerticalCameraAnchor[]>();
