@@ -155,6 +155,7 @@ export class PerformanceEffectLayer {
   private rainbowPreparationIndex = 0;
   private rainbowPreparationFrame: number | null = null;
   private rainbowReady = false;
+  private lastAppliedRainbow = new Map<SVGGraphicsElement, string>();
   private lastViewportWidth = 0;
   private lastViewportHeight = 0;
 
@@ -341,6 +342,11 @@ export class PerformanceEffectLayer {
     const resolvedPaint = paint.kind === "solid"
       ? { kind: "solid" as const, color: recolor(paint.color) }
       : { kind: "gradient" as const, stops: paint.stops.map((stop) => ({ ...stop, color: recolor(stop.color) })) };
+    const paintSignature = resolvedPaint.kind === "solid"
+      ? `solid:${resolvedPaint.color}`
+      : `gradient:${resolvedPaint.stops.map(({ offset, color }) => `${clampUnit(offset).toFixed(4)}:${color.toUpperCase()}`).join("|")}`;
+    const signature = `${paintSignature}:mix=${this.config.mixAmount}`;
+    if (this.lastAppliedRainbow.get(element) === signature) return;
     const value = resolvedPaint.kind === "solid"
       ? resolvedPaint.color
       : this.gradientValue(element, resolvedPaint.stops);
@@ -360,6 +366,7 @@ export class PerformanceEffectLayer {
         leaf.style.setProperty("stroke-opacity", strength, "important");
       }
     });
+    this.lastAppliedRainbow.set(element, signature);
   }
 
   private rememberPaint(element: SVGGraphicsElement): void {
@@ -401,6 +408,7 @@ export class PerformanceEffectLayer {
     this.gradientDefs.clear();
     this.gradientContainers.clear();
     this.gradientCache.clear();
+    this.lastAppliedRainbow.clear();
     this.rainbowPreparationIndex = 0;
     this.rainbowReady = false;
   }
