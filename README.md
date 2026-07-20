@@ -61,7 +61,7 @@ npm run dev
 
 Open <http://127.0.0.1:5173>. The Vite development server proxies `/api` requests to the local Express service at `127.0.0.1:4174`.
 
-Click **选择素材文件夹** (Select Asset Folder) and choose this directory from the repository:
+The application should already load the sample "ode-to-joy", and you can just click "Play" to start playback. If the sample is not loaded, click **选择素材文件夹** (Select Asset Folder) and choose this directory from the repository:
 
 ```text
 sample/ode-to-joy
