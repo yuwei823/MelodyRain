@@ -216,15 +216,22 @@ export async function runExportJob(job: ExportJob, appUrl: string): Promise<void
     const rangeDurationSeconds = job.totalFrames / FPS;
     const audioDelaySeconds = Math.max(0, PRE_ROLL_MS / 1_000 - rangeStartSeconds);
     const audioSeekSeconds = Math.max(0, rangeStartSeconds - PRE_ROLL_MS / 1_000);
+    // Pad real silence at the start of the audio stream instead of shifting
+    // timestamps with -itsoffset. Many mobile players ignore the MP4 edit list
+    // that -itsoffset produces, causing the audio to start before the video.
+    const audioFilters: string[] = [];
+    if (audioDelaySeconds > 0) {
+      audioFilters.push(`adelay=${Math.round(audioDelaySeconds * 1_000)}:all=1`);
+    }
     const ffmpeg = spawn("ffmpeg", [
       "-y", "-f", "image2pipe", "-vcodec", "png", "-framerate", String(FPS), "-i", "pipe:0",
-      ...(audioDelaySeconds > 0 ? ["-itsoffset", String(audioDelaySeconds)] : []),
       ...(audioSeekSeconds > 0 ? ["-ss", String(audioSeekSeconds)] : []),
       "-i", audio.path,
       "-c:v", "libx264",
       "-preset", job.quality === "high" ? "medium" : "veryfast",
       "-crf", job.quality === "high" ? "18" : "22",
       "-pix_fmt", "yuv420p",
+      ...(audioFilters.length > 0 ? ["-af", audioFilters.join(",")] : []),
       "-c:a", "aac", "-b:a", "192k", "-t", String(rangeDurationSeconds),
       "-movflags", "+faststart", job.outputPath,
     ], { stdio: ["pipe", "pipe", "pipe"] });
