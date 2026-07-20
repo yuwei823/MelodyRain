@@ -67,6 +67,8 @@ The application should already load the sample "ode-to-joy", and you can just cl
 sample/ode-to-joy
 ```
 
+![Sample loaded interface](src/assets/readme-sample-loaded.png)
+
 The sample contains:
 
 ```text

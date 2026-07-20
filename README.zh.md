@@ -66,6 +66,8 @@ npm run dev
 sample/ode-to-joy
 ```
 
+![样例已加载界面](src/assets/readme-sample-loaded.png)
+
 此样例包含：
 
 ```text
