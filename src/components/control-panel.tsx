@@ -42,10 +42,8 @@ interface ControlPanelProps {
   onPerformanceMixPercentChange(value: number): void;
   connectedNoteMode: ConnectedNoteMode;
   onConnectedNoteModeChange(value: ConnectedNoteMode): void;
-  frameColorTransitionFrames: number;
   performanceColorRanges: FrameColorRange[];
   totalFrames: number;
-  onFrameColorTransitionFramesChange(value: number): void;
   onPerformanceColorRangesChange(value: FrameColorRange[]): void;
 }
 
@@ -85,10 +83,8 @@ export function ControlPanel({
   onPerformanceMixPercentChange,
   connectedNoteMode,
   onConnectedNoteModeChange,
-  frameColorTransitionFrames,
   performanceColorRanges,
   totalFrames,
-  onFrameColorTransitionFramesChange,
   onPerformanceColorRangesChange,
 }: ControlPanelProps) {
   return (
@@ -276,9 +272,7 @@ export function ControlPanel({
         <small>Shared by solid-color ranges; rainbow ranges always use full color. / 所有单色范围共用；彩虹色始终使用完整色彩。</small>
         <FrameColorRangeControl
           totalFrames={totalFrames}
-          transitionFrames={frameColorTransitionFrames}
           ranges={performanceColorRanges}
-          onTransitionFramesChange={onFrameColorTransitionFramesChange}
           onChange={onPerformanceColorRangesChange}
         />
       </div>

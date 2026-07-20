@@ -2,14 +2,12 @@ import { validFrameColorRanges, type FrameColorMode, type FrameColorRange } from
 
 interface FrameColorRangeControlProps {
   totalFrames: number;
-  transitionFrames: number;
   ranges: FrameColorRange[];
-  onTransitionFramesChange(value: number): void;
   onChange(value: FrameColorRange[]): void;
 }
 
-export function FrameColorRangeControl({ totalFrames, transitionFrames, ranges,
-  onTransitionFramesChange, onChange }: FrameColorRangeControlProps) {
+export function FrameColorRangeControl({ totalFrames, ranges,
+  onChange }: FrameColorRangeControlProps) {
   const update = (id: string, patch: Partial<FrameColorRange>) => {
     const next = ranges.map((range) => range.id === id ? { ...range, ...patch } : range);
     if (validFrameColorRanges(next, totalFrames)) onChange(next);
@@ -28,12 +26,6 @@ export function FrameColorRangeControl({ totalFrames, transitionFrames, ranges,
         <strong>Frame ranges / 帧范围</strong>
         <span>Frames 1–{totalFrames || "—"} / 帧</span>
       </div>
-      <label className="form-row form-row--range">
-        <span>Transition / 过渡帧数</span>
-        <input type="range" min="0" max="60" step="1" value={transitionFrames}
-          onChange={(event) => onTransitionFramesChange(Number(event.target.value))} />
-        <output>{transitionFrames}</output>
-      </label>
       <div className="frame-color-range-list">
         {ranges.map((range, index) => (
           <div className="frame-color-range-item" key={range.id}>

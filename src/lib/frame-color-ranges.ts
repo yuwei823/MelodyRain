@@ -4,7 +4,7 @@ import {
   type PitchStep,
 } from "./performance-effect-layer";
 
-export const DEFAULT_FRAME_COLOR_TRANSITION_FRAMES = 15;
+export const DEFAULT_FRAME_COLOR_TRANSITION_FRAMES = 60;
 
 export type FrameColorMode = "solid" | "rainbow";
 

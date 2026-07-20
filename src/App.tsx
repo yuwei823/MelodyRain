@@ -9,6 +9,7 @@ import { useScoreStage } from "./hooks/use-score-stage";
 import { transportSnapshotAt, type TransportSnapshot } from "./lib/transport";
 import { useVideoExport } from "./hooks/use-video-export";
 import { MidiTimeline } from "./lib/midi";
+import { DEFAULT_FRAME_COLOR_TRANSITION_FRAMES } from "./lib/frame-color-ranges";
 import { videoExportFrameCount } from "./lib/video-export";
 
 function stateLabel(state: TransportSnapshot["state"]): string {
@@ -23,9 +24,9 @@ function stateLabel(state: TransportSnapshot["state"]): string {
 export default function App() {
   const visual = useProjectVisualSettings();
   const frameColorRangeSettings = useMemo(() => ({
-    transitionFrames: visual.frameColorTransitionFrames,
+    transitionFrames: DEFAULT_FRAME_COLOR_TRANSITION_FRAMES,
     ranges: visual.performanceColorRanges,
-  }), [visual.frameColorTransitionFrames, visual.performanceColorRanges]);
+  }), [visual.performanceColorRanges]);
 
   const handleProjectLoaded = useCallback((nextProject: LoadedProject) => {
     visual.adoptProjectSettings(nextProject);
@@ -71,7 +72,6 @@ export default function App() {
     setPaperTransparencyPercent, performanceMixPercent, setPerformanceMixPercent, selectedBackgroundIndex,
     setSelectedBackgroundIndex, currentProjectSettings,
     connectedNoteMode, setConnectedNoteMode,
-    frameColorTransitionFrames, setFrameColorTransitionFrames,
     performanceColorRanges, setPerformanceColorRanges,
   } = visual;
   const { snapshot, activeNotes, audioRef } = transport;
@@ -179,10 +179,8 @@ export default function App() {
           onPerformanceMixPercentChange={setPerformanceMixPercent}
           connectedNoteMode={connectedNoteMode}
           onConnectedNoteModeChange={setConnectedNoteMode}
-          frameColorTransitionFrames={frameColorTransitionFrames}
           performanceColorRanges={performanceColorRanges}
           totalFrames={project ? videoExportFrameCount(project.midi.durationMs) : 0}
-          onFrameColorTransitionFramesChange={setFrameColorTransitionFrames}
           onPerformanceColorRangesChange={setPerformanceColorRanges}
         />
         <PlaybackPanel
