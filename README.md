@@ -43,21 +43,6 @@ Development exports require `npm run dev`, which starts both Vite and the local 
 
 When no project settings file is loaded, the visual defaults are `40%` score-mask black mixing, `10%` paper transparency, and `50%` performance-mask color mixing.
 
-## Recommended color palette
-
-These colors work well for solid backgrounds, title text, and rainbow performance elements:
-
-| Color | HEX | HSL |
-| - | - | - |
-| Red 赤 | **#E84A4A** | 0°, 80%, 52% |
-| Orange 橙 | **#E88A2A** | 30°, 82%, 54% |
-| Yellow 黄 | **#E8C420** | 48°, 78%, 52% |
-| Green 绿 | **#50C850** | 120°, 75%, 55% |
-| Cyan 青 | **#1CAEE8** | 197°, 82%, 51% |
-| Blue 蓝 | **#2A7AE8** | 220°, 80%, 53% |
-| Violet 紫 | **#8A4AE8** | 270°, 78%, 60% |
-| Pink 粉 | **#E84AA0** | 330°, 78%, 60% |
-
 ## Requirements
 
 - Node.js `>=20.19 <27`
@@ -173,3 +158,18 @@ See [MelodyRain_Product_Technical_Spec_v0.1.md](./MelodyRain_Product_Technical_S
 - MusicXML and MIDI are matched against the available score targets, but there is no formal alignment-confidence report or manual correction interface yet;
 - Only a 9:16 portrait stage is available; landscape layouts are not supported;
 - Browsers cannot read arbitrary local paths. The user must select and authorize the asset folder.
+
+## Recommended color palette
+
+These colors work well for solid backgrounds, title text, and rainbow performance elements:
+
+| Color  | Swatch                                                                                                                        | HEX       | HSL            |
+| :----- | :---------------------------------------------------------------------------------------------------------------------------- | :-------- | :------------- |
+| Red    | <span style="display:inline-block;width:24px;height:24px;background:#E84A4A;border-radius:4px;vertical-align:middle;"></span> | `#E84A4A` | 0°, 80%, 52%   |
+| Orange | <span style="display:inline-block;width:24px;height:24px;background:#E88A2A;border-radius:4px;vertical-align:middle;"></span> | `#E88A2A` | 30°, 82%, 54%  |
+| Yellow | <span style="display:inline-block;width:24px;height:24px;background:#E8C420;border-radius:4px;vertical-align:middle;"></span> | `#E8C420` | 48°, 78%, 52%  |
+| Green  | <span style="display:inline-block;width:24px;height:24px;background:#50C850;border-radius:4px;vertical-align:middle;"></span> | `#50C850` | 120°, 75%, 55% |
+| Cyan   | <span style="display:inline-block;width:24px;height:24px;background:#1CAEE8;border-radius:4px;vertical-align:middle;"></span> | `#1CAEE8` | 197°, 82%, 51% |
+| Blue   | <span style="display:inline-block;width:24px;height:24px;background:#2A7AE8;border-radius:4px;vertical-align:middle;"></span> | `#2A7AE8` | 220°, 80%, 53% |
+| Purple | <span style="display:inline-block;width:24px;height:24px;background:#8A4AE8;border-radius:4px;vertical-align:middle;"></span> | `#8A4AE8` | 270°, 78%, 60% |
+| Pink   | <span style="display:inline-block;width:24px;height:24px;background:#E84AA0;border-radius:4px;vertical-align:middle;"></span> | `#E84AA0` | 330°, 78%, 60% |
