@@ -1,45 +1,38 @@
 {
   "version": 5,
-  "title": "🎶 Melody Rain 🎶",
-  "titleColor": "#25364A",
+  "title": "Ode to Joy",
+  "titleColor": "#F4F7FB",
   "titleColorMode": "auto",
   "measuresPerSystem": 2,
-  "backgroundMode": "color",
+  "backgroundMode": "image",
   "backgroundColor": "#F7F8F6",
   "backgroundImageFile": "background.jpeg",
   "maskBlackMixPercent": 45,
-  "paperTransparencyPercent": 48,
+  "paperTransparencyPercent": 15,
   "connectedNoteMode": "together",
   "noteFrameEffect": {
-    "mixStrengthPercent": 61,
+    "mixStrengthPercent": 76,
     "ranges": [
       {
         "id": "8004c410-d04b-4bc6-93f2-65e6575d7789",
         "startFrame": 0,
-        "endFrame": 227,
-        "mode": "solid",
-        "color": "#1CAEE8"
-      },
-      {
-        "id": "7d388468-165c-436d-b4c1-1a5da73cc4a3",
-        "startFrame": 227,
-        "endFrame": 434,
+        "endFrame": 210,
         "mode": "rainbow",
-        "color": "#087AA1"
+        "color": "#E84A4A"
       },
       {
-        "id": "d884f2f9-f940-498f-a0b4-6ba500ad08ee",
-        "startFrame": 434,
-        "endFrame": 661,
+        "id": "77b196ff-b9fa-4342-8990-187cf7bb95eb",
+        "startFrame": 210,
+        "endFrame": 437,
         "mode": "solid",
-        "color": "#D50DFD"
+        "color": "#E91C3A"
       },
       {
-        "id": "41a30bb2-4204-45c2-8485-cd1701424d75",
-        "startFrame": 661,
-        "endFrame": 888,
-        "mode": "solid",
-        "color": "#44E817"
+        "id": "64b0ddcf-41da-40fd-b8c4-c2915e7f9a64",
+        "startFrame": 437,
+        "endFrame": 664,
+        "mode": "rainbow",
+        "color": "#1CAEE8"
       }
     ]
   }
