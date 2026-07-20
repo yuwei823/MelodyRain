@@ -41,4 +41,26 @@ describe("MIDI timeline", () => {
   it("rejects data without an MThd signature", () => {
     expect(() => parseMidi(new TextEncoder().encode("not midi").buffer)).toThrow(/MIDI/);
   });
+
+  it("reports active notes matching the naive filter for overlapping notes", () => {
+    const midi = new Midi();
+    const track = midi.addTrack();
+    track.addNote({ midi: 60, time: 0, duration: 1, velocity: 0.8 });
+    track.addNote({ midi: 64, time: 0.5, duration: 1, velocity: 0.7 });
+    track.addNote({ midi: 67, time: 2, duration: 0.5, velocity: 0.6 });
+    const bytes = midi.toArray();
+    const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+    const summary = parseMidi(buffer);
+    const timeline = new MidiTimeline(summary);
+
+    const naive = (timeMs: number) => summary.events.filter((event) => event.attackMs <= timeMs && event.releaseMs > timeMs);
+    for (const event of summary.events) {
+      expect(timeline.activeNotesAt(event.attackMs)).toEqual(naive(event.attackMs));
+      expect(timeline.activeNotesAt(event.attackMs + Math.floor(event.durationMs / 2))).toEqual(
+        naive(event.attackMs + Math.floor(event.durationMs / 2)),
+      );
+    }
+    expect(timeline.activeNotesAt(-1)).toEqual(naive(-1));
+    expect(timeline.activeNotesAt(summary.durationMs + 1_000)).toEqual(naive(summary.durationMs + 1_000));
+  });
 });

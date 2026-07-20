@@ -101,6 +101,25 @@ export class MidiTimeline {
   }
 
   activeNotesAt(timeMs: number): MidiNoteEvent[] {
-    return this.summary.events.filter((event) => event.attackMs <= timeMs && event.releaseMs > timeMs);
+    // Events are sorted by attackMs. Find the upper bound of events that have
+    // already started, then filter by release time. This is O(log n + k)
+    // instead of O(n) and matters for large MIDI files.
+    const events = this.summary.events;
+    let left = 0;
+    let right = events.length;
+    while (left < right) {
+      const mid = (left + right) >>> 1;
+      if (events[mid]!.attackMs <= timeMs) {
+        left = mid + 1;
+      } else {
+        right = mid;
+      }
+    }
+    const active: MidiNoteEvent[] = [];
+    for (let index = 0; index < left; index += 1) {
+      const event = events[index]!;
+      if (event.releaseMs > timeMs) active.push(event);
+    }
+    return active;
   }
 }
