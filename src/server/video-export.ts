@@ -185,6 +185,13 @@ function waitForProcess(process: ChildProcessWithoutNullStreams): Promise<void> 
   });
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
+  ]);
+}
+
 export async function runExportJob(job: ExportJob, appUrl: string): Promise<void> {
   const audio = job.assets.find((asset) => asset.field === "audio");
   if (!audio) throw new Error("Audio file missing / 缺少音频文件");
@@ -247,12 +254,20 @@ export async function runExportJob(job: ExportJob, appUrl: string): Promise<void
       if (job.cancelled) throw new Error("EXPORT_CANCELLED");
       const absoluteFrame = job.startFrame + index;
       const sourceTimeMs = absoluteFrame * 1_000 / FPS - PRE_ROLL_MS;
-      await page.evaluate(async (timeMs) => {
-        const api = (window as unknown as { __MELODY_RAIN_EXPORT__?: { renderFrame(time: number): Promise<void> } }).__MELODY_RAIN_EXPORT__;
-        if (!api) throw new Error("Export frame API unavailable");
-        await api.renderFrame(timeMs);
-      }, sourceTimeMs);
-      const image = await frameElement.screenshot({ type: "png", animations: "disabled" });
+      await withTimeout(
+        page.evaluate(async (timeMs) => {
+          const api = (window as unknown as { __MELODY_RAIN_EXPORT__?: { renderFrame(time: number): Promise<void> } }).__MELODY_RAIN_EXPORT__;
+          if (!api) throw new Error("Export frame API unavailable");
+          await api.renderFrame(timeMs);
+        }, sourceTimeMs),
+        30_000,
+        `Frame render timed out at frame ${absoluteFrame} / 第 ${absoluteFrame} 帧渲染超时`,
+      );
+      const image = await withTimeout(
+        frameElement.screenshot({ type: "png", animations: "disabled" }),
+        30_000,
+        `Frame screenshot timed out at frame ${absoluteFrame} / 第 ${absoluteFrame} 帧截图超时`,
+      );
       await writeFrame(ffmpeg.stdin, image);
       job.completedFrames = index + 1;
       job.progress = job.completedFrames / job.totalFrames;
@@ -284,6 +299,7 @@ export async function runExportJob(job: ExportJob, appUrl: string): Promise<void
 }
 
 export async function cancelExportJob(job: ExportJob): Promise<void> {
+  if (job.phase === "completed" || job.phase === "error" || job.phase === "cancelled") return;
   job.cancelled = true;
   job.ffmpeg?.kill();
   await job.browser?.close().catch(() => undefined);
