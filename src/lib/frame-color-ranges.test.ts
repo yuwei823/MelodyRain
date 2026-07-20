@@ -49,6 +49,38 @@ describe("frame color ranges", () => {
     expect(resolveFrameColorConfig(60, GLOBAL, rainbow).mode).toBe("rainbow");
   });
 
+  it("blends solid into rainbow across the transition frames", () => {
+    const settings: FrameColorRangeSettings = {
+      transitionFrames: 15,
+      ranges: [
+        { id: "intro", startFrame: 0, endFrame: 30, mode: "solid", color: "#000000" },
+        { id: "chorus", startFrame: 30, endFrame: 60, mode: "rainbow", color: "#000000" },
+      ],
+    };
+    expect(resolveFrameColorConfig(29, GLOBAL, settings)).toMatchObject({ mode: "mask", mixColor: "#000000" });
+    const start = resolveFrameColorConfig(30, GLOBAL, settings);
+    expect(start.mode).toBe("rainbow");
+    expect(start.palette?.C).toBe("#100607");
+    expect(resolveFrameColorConfig(37, GLOBAL, settings).palette?.C).toBe("#80323A");
+    const settled = resolveFrameColorConfig(44, GLOBAL, settings);
+    expect(settled.mode).toBe("rainbow");
+    expect(settled.palette?.C).toBe("#F05D6C");
+  });
+
+  it("blends rainbow into solid across the transition frames and settles on the mask renderer", () => {
+    const settings: FrameColorRangeSettings = {
+      transitionFrames: 15,
+      ranges: [
+        { id: "intro", startFrame: 0, endFrame: 30, mode: "rainbow", color: "#FFFFFF" },
+        { id: "chorus", startFrame: 30, endFrame: 60, mode: "solid", color: "#FFFFFF" },
+      ],
+    };
+    const start = resolveFrameColorConfig(30, GLOBAL, settings);
+    expect(start.mode).toBe("rainbow");
+    expect(start.palette?.C).toBe("#F16876");
+    expect(resolveFrameColorConfig(44, GLOBAL, settings)).toMatchObject({ mode: "mask", mixColor: "#FFFFFF" });
+  });
+
   it("carries the latest range setting through gaps and to the final frame", () => {
     expect(resolveFrameColorConfig(75, GLOBAL, SETTINGS)).toMatchObject({
       mode: "mask",

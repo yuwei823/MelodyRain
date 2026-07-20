@@ -109,7 +109,7 @@ export function resolveFrameColorConfig(
     ? 1
     : Math.min(1, (frame - boundary + 1) / transitionFrames);
   const previous = boundary === undefined ? current : styleAt(boundary - 1, globalConfig, ranges);
-  if (previous.mode !== current.mode) {
+  if (previous.mode !== current.mode && progress >= 1) {
     return current.mode === "solid"
       ? { mode: "mask", mixColor: current.color, mixAmount: globalConfig.mixAmount }
       : {
@@ -119,13 +119,16 @@ export function resolveFrameColorConfig(
         palette: palette("rainbow", current.color),
       };
   }
-  if (current.mode === "solid") {
+  if (current.mode === "solid" && previous.mode === "solid") {
     return {
       mode: "mask",
       mixColor: mixHexColors(previous.color, current.color, progress),
       mixAmount: globalConfig.mixAmount,
     };
   }
+  // Rainbow↔solid switches cross-fade through the rainbow renderer: a palette
+  // whose steps all equal the solid color matches the solid endpoint, so the
+  // mode switch eases across transitionFrames instead of cutting hard.
   const fromPalette = palette(previous.mode, previous.color);
   const toPalette = palette(current.mode, current.color);
   const resolvedPalette = Object.fromEntries((Object.keys(toPalette) as PitchStep[])
