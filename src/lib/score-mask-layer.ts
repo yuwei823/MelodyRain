@@ -38,7 +38,7 @@ export function scoreViewportLayout(style: CSSStyleDeclaration): ScoreViewportLa
   return {
     top: cssPixelValue(style, "--score-toolbar-height", 78),
     right: cssPixelValue(style, "--score-paper-inset-right", 10),
-    bottom: cssPixelValue(style, "--score-paper-inset-bottom", 10),
+    bottom: cssPixelValue(style, "--score-paper-inset-bottom", 20),
     left: cssPixelValue(style, "--score-paper-inset-left", 10),
   };
 }

@@ -42,7 +42,7 @@ function saveBlob(blob: Blob, fileName: string): void {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = fileName.toLowerCase().endsWith(".mp4") ? fileName : `${fileName}.mp4`;
+  link.download = mp4FileName(fileName);
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }

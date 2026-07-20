@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { ControlPanel } from "./components/control-panel";
 import { PlaybackPanel } from "./components/playback-panel";
 import { StagePanel } from "./components/stage-panel";
+import { StatusPill } from "./components/ui/status-pill";
 import { useProjectLoader, type LoadedProject } from "./hooks/use-project-loader";
 import { useMediaTransport } from "./hooks/use-media-transport";
 import { useProjectVisualSettings } from "./hooks/use-project-visual-settings";
@@ -124,6 +125,8 @@ export default function App() {
     }
   };
 
+  const totalFrames = project ? videoExportFrameCount(project.midi.durationMs) : 0;
+
   return (
     <main className="app-shell">
       <header className="hero">
@@ -132,10 +135,7 @@ export default function App() {
           <p className="subtitle">Let music fall into your life again. / 让音乐，再次落进生活。</p>
         </div>
         <div className="hero-meta">
-          <div className={`status-pill ${error ? "is-error" : ""}`}>
-            <span className="status-dot" />
-            {error ?? status}
-          </div>
+          <StatusPill message={error ?? status} isError={Boolean(error)} />
         </div>
       </header>
 
@@ -159,7 +159,7 @@ export default function App() {
           titleColor={titleColor}
           titleColorMode={titleColorMode}
           onTitleColorChange={(color) => {
-            setTitleColor(color.toUpperCase());
+            setTitleColor(color);
             setTitleColorMode("custom");
           }}
           onUseAutoTitleColor={() => setTitleColorMode("auto")}
@@ -180,7 +180,7 @@ export default function App() {
           connectedNoteMode={connectedNoteMode}
           onConnectedNoteModeChange={setConnectedNoteMode}
           performanceColorRanges={performanceColorRanges}
-          totalFrames={project ? videoExportFrameCount(project.midi.durationMs) : 0}
+          totalFrames={totalFrames}
           onPerformanceColorRangesChange={setPerformanceColorRanges}
         />
         <PlaybackPanel
@@ -189,6 +189,7 @@ export default function App() {
           snapshot={snapshot}
           activeNotes={activeNotes}
           targetCount={targetCount}
+          totalFrames={totalFrames}
           audioRef={audioRef}
           stateLabel={stateLabel(snapshot.state)}
           onTogglePlayback={() => void togglePlayback()}
@@ -196,6 +197,7 @@ export default function App() {
           onSeek={transport.seek}
           onTempoScaleChange={transport.setTempoScale}
           exportPhase={videoExport.phase}
+          exportActive={videoExport.active}
           exportProgress={videoExport.progress}
           exportError={videoExport.error}
           onStartExport={(fileName, quality, frameRange) => void videoExport.start(fileName, quality, frameRange)}

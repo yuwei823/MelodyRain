@@ -3,16 +3,21 @@ import { formatDuration } from "../lib/format";
 import {
   VIDEO_EXPORT_PROFILES,
   validVideoExportFrameRange,
-  videoExportFrameCount,
   type VideoExportFrameRange,
   type VideoExportQuality,
 } from "../lib/video-export";
 import type { VideoExportPhase } from "../hooks/use-video-export";
+import { Button } from "./ui/button";
+import { CardHeading } from "./ui/card-heading";
+import { KeyValueList } from "./ui/kv-list";
+import { SegmentedControl } from "./ui/segmented-control";
 
 interface ExportCardProps {
   projectLabel?: string;
   durationMs?: number;
+  totalFrames: number;
   phase: VideoExportPhase;
+  active: boolean;
   progress: number;
   error: string | null;
   onStart(fileName: string, quality: VideoExportQuality, frameRange: VideoExportFrameRange): void;
@@ -40,96 +45,100 @@ const PHASE_LABELS: Record<VideoExportPhase, string> = {
 export function ExportCard({
   projectLabel,
   durationMs = 0,
+  totalFrames,
   phase,
+  active,
   progress,
   error,
   onStart,
   onCancel,
 }: ExportCardProps) {
-  const totalFrames = videoExportFrameCount(durationMs);
   const [fileName, setFileName] = useState(exportFileName(projectLabel));
   const [quality, setQuality] = useState<VideoExportQuality>("standard");
   const [startFrame, setStartFrame] = useState(0);
   const [endFrame, setEndFrame] = useState(totalFrames);
   const profile = VIDEO_EXPORT_PROFILES[quality];
-  const active = phase === "preparing" || phase === "rendering" || phase === "finalizing";
   const frameRange = { startFrame, endFrame };
   const validRange = validVideoExportFrameRange(frameRange, totalFrames);
-  useEffect(() => { setFileName(exportFileName(projectLabel)); }, [projectLabel]);
-  useEffect(() => {
+  const resetRange = () => {
     setStartFrame(0);
     setEndFrame(totalFrames);
-  }, [totalFrames]);
+  };
+  useEffect(() => { setFileName(exportFileName(projectLabel)); }, [projectLabel]);
+  useEffect(resetRange, [totalFrames]);
   return (
     <section className="ui-card ui-stack export-card" aria-labelledby="export-card-title">
-      <div className="export-card-heading">
-        <p className="step-label" id="export-card-title">EXPORT / 视频导出</p>
-        <span>{PHASE_LABELS[phase]}</span>
-      </div>
+      <CardHeading id="export-card-title" title="EXPORT / 视频导出" status={PHASE_LABELS[phase]} />
 
-      <fieldset className="export-quality" disabled={active}>
+      <fieldset className="export-field" disabled={active}>
         <legend>Quality / 导出质量</legend>
-        {(Object.entries(VIDEO_EXPORT_PROFILES) as Array<
-          [VideoExportQuality, (typeof VIDEO_EXPORT_PROFILES)[VideoExportQuality]]
-        >).map(([value, option]) => (
-          <label key={value} className={quality === value ? "is-active" : ""}>
-            <input
-              type="radio"
-              name="export-quality"
-              value={value}
-              checked={quality === value}
-              onChange={() => setQuality(value)}
-            />
-            <strong>{option.label}</strong>
-            <small>{option.width} × {option.height}</small>
-          </label>
-        ))}
+        <SegmentedControl<VideoExportQuality>
+          label="Quality / 导出质量"
+          options={(Object.entries(VIDEO_EXPORT_PROFILES) as Array<
+            [VideoExportQuality, (typeof VIDEO_EXPORT_PROFILES)[VideoExportQuality]]
+          >).map(([value, option]) => ({
+            value,
+            label: (
+              <span className="segmented-option">
+                <strong>{option.label}</strong>
+                <small>{option.width} × {option.height}</small>
+              </span>
+            ),
+          }))}
+          value={quality}
+          onChange={setQuality}
+        />
       </fieldset>
 
-      <div className="export-specs" aria-label="Export settings / 导出设置">
-        <div><span>Resolution / 分辨率</span><strong>{profile.width} × {profile.height}</strong></div>
-        <div><span>Frame rate / 帧率</span><strong>{profile.fps} FPS</strong></div>
-        <div><span>Format / 格式</span><strong>MP4 · H.264</strong></div>
-        <div><span>Duration / 时长</span><strong>{formatDuration(durationMs)}</strong></div>
-        <div><span>Total frames / 总帧数</span><strong>{durationMs > 0 ? totalFrames : "—"}</strong></div>
-      </div>
+      <KeyValueList
+        variant="boxed"
+        ariaLabel="Export settings / 导出设置"
+        items={[
+          { label: "Resolution / 分辨率", value: `${profile.width} × ${profile.height}` },
+          { label: "Frame rate / 帧率", value: `${profile.fps} FPS` },
+          { label: "Format / 格式", value: "MP4 · H.264" },
+          { label: "Duration / 时长", value: formatDuration(durationMs) },
+          { label: "Total frames / 总帧数", value: durationMs > 0 ? totalFrames : "—" },
+        ]}
+      />
 
-      <fieldset className="export-frame-range" disabled={active || durationMs <= 0}>
+      <fieldset className="export-field" disabled={active || durationMs <= 0}>
         <legend>Frame range / 导出帧范围</legend>
-        <div>
+        <div className="frame-range-fields">
           <label>
             <span>Start frame / 起始帧</span>
             <input
-              type="number"
-              min="0"
-              max={Math.max(0, totalFrames - 1)}
-              step="1"
-              value={startFrame}
-              onChange={(event) => setStartFrame(Number(event.target.value))}
+              type="text"
+              inputMode="numeric"
+              value={startFrame + 1}
+              onChange={(event) => {
+                const raw = event.target.value;
+                if (/^\d+$/.test(raw)) setStartFrame(Number(raw) - 1);
+              }}
             />
           </label>
           <label>
             <span>End frame / 结束帧</span>
             <input
-              type="number"
-              min="1"
-              max={totalFrames}
-              step="1"
+              type="text"
+              inputMode="numeric"
               value={endFrame}
-              onChange={(event) => setEndFrame(Number(event.target.value))}
+              onChange={(event) => {
+                const raw = event.target.value;
+                if (/^\d+$/.test(raw)) setEndFrame(Number(raw));
+              }}
             />
           </label>
         </div>
         <small>
-          Frames {startFrame}–{endFrame} (end excluded) · {validRange ? endFrame - startFrame : 0} frames / 帧
+          Frames {startFrame + 1}–{endFrame} · {validRange ? endFrame - startFrame : 0} frames / 帧
         </small>
         <small>
           {formatDuration(startFrame * 1_000 / profile.fps)}–{formatDuration(endFrame * 1_000 / profile.fps)}
         </small>
-        <button className="ui-button ui-button--ghost ui-button--compact" type="button"
-          onClick={() => { setStartFrame(0); setEndFrame(totalFrames); }}>
+        <Button variant="ghost" compact className="export-full-range" onClick={resetRange}>
           Full range / 完整范围
-        </button>
+        </Button>
       </fieldset>
 
       <label className="export-file-name">
@@ -145,19 +154,19 @@ export function ExportCard({
 
       {active && (
         <div className="export-progress" aria-live="polite">
-          <progress max="1" value={progress} />
+          <progress max="1" value={progress} aria-label="Export progress / 导出进度" />
           <span>{Math.round(progress * 100)}%</span>
         </div>
       )}
-      {error && <small className="export-error">{error}</small>}
-      <button
-        className={`ui-button ${active ? "ui-button--danger" : "ui-button--primary"} export-button`}
-        type="button"
+      {error && <small className="export-error" role="alert">{error}</small>}
+      <Button
+        variant={active ? "danger" : "primary"}
+        className="export-button"
         disabled={!active && (!projectLabel || !fileName.trim() || !validRange)}
         onClick={() => active ? onCancel() : onStart(fileName.trim(), quality, frameRange)}
       >
         {active ? "Cancel export / 取消导出" : "Export video / 导出视频"}
-      </button>
+      </Button>
       <small>Rendered locally with Chrome and FFmpeg. / 使用本地 Chrome 与 FFmpeg 渲染。</small>
     </section>
   );

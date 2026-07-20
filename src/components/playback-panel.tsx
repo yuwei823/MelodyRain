@@ -7,10 +7,13 @@ import { ExportCard } from "./export-card";
 import type { VideoExportPhase } from "../hooks/use-video-export";
 import {
   videoExportCurrentFrame,
-  videoExportFrameCount,
   type VideoExportFrameRange,
   type VideoExportQuality,
 } from "../lib/video-export";
+import { Button } from "./ui/button";
+import { CardHeading } from "./ui/card-heading";
+import { KeyValueList } from "./ui/kv-list";
+import { SegmentedControl } from "./ui/segmented-control";
 
 interface PlaybackPanelProps {
   project: LoadedProject | null;
@@ -18,6 +21,7 @@ interface PlaybackPanelProps {
   snapshot: TransportSnapshot;
   activeNotes: MidiNoteEvent[];
   targetCount: number;
+  totalFrames: number;
   audioRef: RefObject<HTMLAudioElement | null>;
   stateLabel: string;
   onTogglePlayback(): void;
@@ -25,6 +29,7 @@ interface PlaybackPanelProps {
   onSeek(progress: number): void;
   onTempoScaleChange(scale: number): void;
   exportPhase: VideoExportPhase;
+  exportActive: boolean;
   exportProgress: number;
   exportError: string | null;
   onStartExport(fileName: string, quality: VideoExportQuality, frameRange: VideoExportFrameRange): void;
@@ -37,6 +42,7 @@ export function PlaybackPanel({
   snapshot,
   activeNotes,
   targetCount,
+  totalFrames,
   audioRef,
   stateLabel,
   onTogglePlayback,
@@ -44,27 +50,24 @@ export function PlaybackPanel({
   onSeek,
   onTempoScaleChange,
   exportPhase,
+  exportActive,
   exportProgress,
   exportError,
   onStartExport,
   onCancelExport,
 }: PlaybackPanelProps) {
   const exportDurationMs = project?.midi.durationMs ?? 0;
-  const totalFrames = project ? videoExportFrameCount(exportDurationMs) : 0;
   const currentFrame = videoExportCurrentFrame(snapshot.sourceTimeMs, totalFrames);
   return (
     <aside className="app-panel playback-panel">
       <div className="ui-card ui-stack sidebar-transport" aria-label="Playback controls / 播放控制">
         <audio ref={audioRef} aria-label="Score audio / 乐谱音频" />
-        <div className="sidebar-transport-heading">
-          <p className="step-label">PREVIEW / 预览</p>
-          <span>{stateLabel}</span>
-        </div>
+        <CardHeading title="PREVIEW / 预览" status={stateLabel} />
         <div className="playback-buttons">
-          <button className="ui-button ui-button--round round-button" type="button" onClick={onRewind} aria-label="Rewind / 回到开头">↺</button>
-          <button className="ui-button ui-button--primary play-button" type="button" onClick={onTogglePlayback}>
+          <Button round onClick={onRewind} aria-label="Rewind / 回到开头">↺</Button>
+          <Button variant="primary" pill onClick={onTogglePlayback}>
             {snapshot.state === "playing" ? "Pause / 暂停" : "Play / 播放"}
-          </button>
+          </Button>
         </div>
         <div className="timeline-control">
           <input
@@ -82,18 +85,14 @@ export function PlaybackPanel({
           </div>
         </div>
 
-        <div className="speed-group" aria-label="Playback speed / 播放速度">
+        <div className="speed-group">
           <span className="speed-label">Playback speed / 播放速度</span>
-          {[0.9, 0.95, 1].map((speed) => (
-            <button
-              type="button"
-              className={`ui-button ui-button--ghost ui-button--compact ${snapshot.tempoScale === speed ? "is-active" : ""}`}
-              key={speed}
-              onClick={() => onTempoScaleChange(speed)}
-            >
-              {speed}×
-            </button>
-          ))}
+          <SegmentedControl
+            label="Playback speed / 播放速度"
+            options={[0.9, 0.95, 1].map((speed) => ({ value: speed, label: `${speed}×` }))}
+            value={snapshot.tempoScale}
+            onChange={onTempoScaleChange}
+          />
         </div>
         <div className="transport-stats">
           <span>{snapshot.effectiveBpm.toFixed(0)} BPM</span>
@@ -113,7 +112,9 @@ export function PlaybackPanel({
       <ExportCard
         projectLabel={exportTitle}
         durationMs={exportDurationMs}
+        totalFrames={totalFrames}
         phase={exportPhase}
+        active={exportActive}
         progress={exportProgress}
         error={exportError}
         onStart={onStartExport}
@@ -121,14 +122,18 @@ export function PlaybackPanel({
       />
 
       {project && (
-        <div className="ui-card facts">
-          <div><span>Score / 乐谱</span><strong>{project.score.title}</strong></div>
-          <div><span>Instruments / 乐器</span><strong>{project.score.partNames.join(" · ") || "—"}</strong></div>
-          <div><span>Measures / 小节</span><strong>{project.score.measureCount}</strong></div>
-          <div><span>MIDI notes / MIDI 音符</span><strong>{project.midi.noteCount}</strong></div>
-          <div><span>Tempo events / 速度事件</span><strong>{project.midi.tempoMap.length}</strong></div>
-          <div><span>SVG targets / SVG 落点</span><strong>{targetCount}</strong></div>
-        </div>
+        <KeyValueList
+          variant="large"
+          className="ui-card"
+          items={[
+            { label: "Score / 乐谱", value: project.score.title },
+            { label: "Instruments / 乐器", value: project.score.partNames.join(" · ") || "—" },
+            { label: "Measures / 小节", value: project.score.measureCount },
+            { label: "MIDI notes / MIDI 音符", value: project.midi.noteCount },
+            { label: "Tempo events / 速度事件", value: project.midi.tempoMap.length },
+            { label: "SVG targets / SVG 落点", value: targetCount },
+          ]}
+        />
       )}
     </aside>
   );

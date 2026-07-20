@@ -38,7 +38,11 @@ MelodyRain 是一个本地优先的五线谱演奏动画工具：读取 MusicXML
 - `src/hooks/` — React 组装层：`use-score-stage.ts` 是渲染编排中枢（创建/更新各 layer 与相机），
   `use-media-transport.ts` 播放控制，`use-project-loader.ts` 素材文件夹加载与设置持久化，
   `use-project-visual-settings.ts` 所有可视化参数的状态与导入导出
-- `src/components/` — UI：`control-panel` / `playback-panel` / `stage-panel` / `export-card` / `frame-color-range-control`
+- `src/components/` — UI：`control-panel` / `playback-panel` / `stage-panel` / `export-card` / `frame-color-range-control`。
+  共享原语在 `src/components/ui/`（`Button` / `SegmentedControl` / `SliderField` / `ColorField` /
+  `KeyValueList` / `CardHeading` / `StatusPill`）——新 UI 一律用原语，
+  不要内联拼装 `ui-button`、`form-row`、`segmented-control` 等 class；设计令牌集中在
+  `src/styles/_tokens.scss`（颜色/圆角/字号/布局常量），新增样式优先引用令牌而非写字面量
 - `src/server/` — 本地服务：`index.ts`（Express 路由）、`video-export.ts`（导出任务生命周期）
 - `sample/ode-to-joy/` — 内置示例素材（欢乐颂）
 

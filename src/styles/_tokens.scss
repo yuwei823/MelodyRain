@@ -1,32 +1,66 @@
+// Accent & brand
 $color-cyan: #76ddff;
+$color-accent: rgb(108, 204, 255);
+$color-selected-bg: #294a67;
+$color-danger: #ff5e85;
+$color-paper: #eef1f5;
+
+// Surfaces & lines
 $color-panel: rgba(15, 27, 46, 0.82);
 $color-line: rgba(151, 190, 224, 0.16);
+$color-line-soft: rgba(151, 190, 224, 0.1);
+$color-line-strong: rgba(151, 190, 224, 0.24);
 $color-control-bg: rgba(0, 0, 0, 0.16);
 $color-control-border: rgba(151, 190, 224, 0.2);
-$color-muted: #7890a8;
 $color-card-bg: rgba(5, 14, 26, 0.25);
-$color-selected-bg: #294a67;
 
+// Text scale
+$color-text: #eaf2ff;
+$color-text-soft: #cbd9e9;
+$color-text-mute: #a9bed3;
+$color-muted: #7890a8;
+$color-text-faint: #6f859c;
+
+// Layout
 $sidebar-width: 342px;
 $workspace-gap: 24px;
-$card-radius: 12px;
-$control-radius: 7px;
+$stage-width: 540px;
 $desktop-breakpoint: 1300px;
 $mobile-breakpoint: 900px;
 $compact-breakpoint: 560px;
 
+// Radii
+$card-radius: 12px;
+$control-radius: 7px;
+$radius-md: 8px;
+$radius-lg: 9px;
+$radius-pill: 999px;
+
+// Type scale
+$font-xs: 9px;
+$font-sm: 10px;
+$font-md: 11px;
+$font-lg: 12px;
+
 :root {
   font-family: Inter, "Segoe UI Variable", "Microsoft YaHei", sans-serif;
-  color: #eaf2ff;
+  color: $color-text;
   background: #07101d;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   --cyan: #{$color-cyan};
   --panel: #{$color-panel};
   --line: #{$color-line};
+  --line-soft: #{$color-line-soft};
+  --line-strong: #{$color-line-strong};
   --control-bg: #{$color-control-bg};
   --control-border: #{$color-control-border};
-  --muted: #{$color-muted};
   --card-bg: #{$color-card-bg};
   --selected-bg: #{$color-selected-bg};
+  --danger: #{$color-danger};
+  --text: #{$color-text};
+  --text-soft: #{$color-text-soft};
+  --text-mute: #{$color-text-mute};
+  --muted: #{$color-muted};
+  --text-faint: #{$color-text-faint};
 }
