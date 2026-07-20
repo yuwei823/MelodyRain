@@ -1,72 +1,73 @@
 # MelodyRain
 
-[简体中文](./README.md) | [English](./README.en.md)
+[简体中文](./README.zh.md) | [English](./README.md)
 
-MelodyRain 是一个本地优先的五线谱演奏动画工具。它读取 MusicXML/MXL、MIDI 和 MP3，用同一个时间轴驱动音频播放、谱面滚动、音符下落与命中效果，并支持把谱面和演奏元素显示为背景图片或颜色的蒙版。
+MelodyRain is a local-first animated sheet-music application. It reads MusicXML/MXL, MIDI, and MP3 files, then uses a single timeline to drive audio playback, score scrolling, falling notes, and hit effects. Score and performance elements can also reveal a shared background image or color through masks.
 
-当前版本支持浏览器内的竖屏预览与本地 MP4 视频导出。
+The current version supports portrait-format previews in the browser and local MP4 video export.
 
-## Codex 与 GPT-5.6 的使用方式
+## How Codex & GPT-5.6 were used
 
-GPT-5.6 通过 Codex 参与了 Melody Rain 的完整创作过程，是项目开发期间使用的主要 AI 模型。它帮助我们将最初的情感构想转化为产品规格和技术规格，起草并持续维护 README，设计项目架构，生成和重构 React、TypeScript、SCSS、Express、Playwright 与 FFmpeg 相关代码，编写测试、诊断问题，并持续迭代同步机制、动画、UI 和视频导出行为。GPT-5.6 在本项目中扮演的是开发协作者，而不是嵌入 Melody Rain 的运行时模型；用户预览或导出演奏视频时，应用目前不会调用 OpenAI API。
+GPT-5.6, accessed through Codex, was the primary AI model used throughout the creation of Melody Rain. It helped turn the initial emotional concept into the product and technical specification, draft and maintain the README, design the architecture, generate and refactor the React, TypeScript, SCSS, Express, Playwright, and FFmpeg code, write tests, diagnose bugs, and iterate on synchronization, animation, UI, and export behavior. GPT-5.6 was used as a development collaborator across the project rather than as a model embedded in Melody Rain at runtime; the application itself does not currently call the OpenAI API while a user previews or exports a performance.
 
-## 功能概览
+## Features
 
-- 使用 OpenSheetMusicDisplay 渲染 SVG 五线谱；
-- 自动匹配素材文件夹内同名的 MXL/MusicXML、MIDI 和 MP3；
-- 播放、暂停、回到开头、进度跳转和 `0.9×`、`0.95×`、`1×` 变速；
-- 预览区显示与导出时间轴一致的当前帧号；通过本地 Chrome 逐帧渲染，并由 FFmpeg 导出 30 FPS、H.264/AAC MP4 视频，支持帧范围、普通/高清质量、进度显示与取消；
-- 音符、和弦、休止符及相关记谱元素随演奏下落、命中并停留；
-- 谱面采用三阶段纵向相机：当前谱表行到达画面中线前静止，随后居中跟随当前谱表行；谱尾完整显示后提前停止，尾声自然向画面下方推进；
-- 谱面结构使用固定背景源蒙版，可选择图片或纯色，并调节黑色混入和谱纸透明度；
-- 演奏元素可选择“共用蒙版”或 C–B 彩虹配色；
-- 共享连杆音符可选择“一并落下”或首音落地后随 note-on 从左向右展开；
-- 标题支持自动对比色和自定义颜色；
-- 每行小节数可在 1–6 之间调整；
-- 项目参数可保存为 `melody-rain.settings.json`，再次载入素材文件夹时自动恢复。
+- Renders SVG sheet music with OpenSheetMusicDisplay;
+- Automatically matches MXL/MusicXML, MIDI, and MP3 files with the same base name in an asset folder;
+- Supports play, pause, rewind, seeking, and `0.9×`, `0.95×`, and `1×` playback speeds;
+- Displays the current absolute export-timeline frame during preview, and deterministically renders selectable frame ranges with local Chrome into 30 FPS H.264/AAC MP4 through FFmpeg, with standard/high quality, progress, and cancellation;
+- Animates notes, chords, rests, and related notation as they fall, hit, and settle onto the score;
+- Uses a three-phase vertical camera: stationary until the active score row reaches the screen midpoint, then smoothly follows that row near the vertical center, and stops early once the complete score ending is visible;
+- Uses a fixed image or solid color as the score mask source, with adjustable black mixing and paper transparency;
+- Offers shared-mask and C–B rainbow styles for performance elements;
+- Lets beamed note groups fall together or expand left to right after the first note lands;
+- Supports automatic high-contrast or custom title colors;
+- Allows 1–6 measures per system;
+- Saves project parameters to `melody-rain.settings.json` and restores them when the asset folder is loaded again.
 
-## 视频导出
+## Video Export
 
-导出由本地 Express 服务创建任务，Playwright 驱动本机 Chrome 或 Edge 按绝对时间逐帧渲染，PNG 帧通过管道直接交给 FFmpeg，与素材 MP3 一起封装为 H.264/AAC MP4。预览和导出共用同一个 Transport、谱面相机和动画状态计算。
+The local Express service creates an export job. Playwright drives an installed Chrome or Edge browser to render deterministic frames from absolute timeline times, then pipes PNG frames to FFmpeg and muxes them with the supplied MP3 as an H.264/AAC MP4. Preview and export share the same Transport, score camera, and animation-state calculations.
 
-- 普通质量默认输出 `540 × 960`、30 FPS，并使用更快的编码预设；
-- 高清质量输出 `1080 × 1920`、30 FPS；
-- 默认导出全曲，也可输入包含起始帧、不包含结束帧的局部范围；帧号包含 1.2 秒音符入场预卷，第 36 帧对应乐曲时间 0；
-- 支持任务进度、取消和错误提示；服务端限制最大并发数并校验 Origin 头；
-- 音频同步使用 FFmpeg `adelay` 滤镜填充真实静音，避免部分手机播放器因忽略 MP4 edit list 而出现音画不同步；
-- 默认文件名取当前画面标题，并自动替换 Windows 文件名非法字符；
-- 浏览器具有素材文件夹写入权限时，视频直接保存到素材文件夹；否则回退到浏览器下载目录；
-- 保存完成后弹窗通知文件名和保存方式。
+- Standard quality defaults to `540 × 960` at 30 FPS with a faster encoder preset;
+- High quality outputs `1080 × 1920` at 30 FPS;
+- Full-song export remains the default, while an optional half-open frame range includes the start frame and excludes the end frame; frame numbers include the 1.2-second entrance pre-roll, so frame 36 is source time zero;
+- Full-score export with a 1.2-second falling-note pre-roll;
+- Progress, cancellation, and error reporting; the server enforces a concurrency limit and validates the Origin header;
+- Audio sync uses the FFmpeg `adelay` filter to pad real silence, avoiding A/V drift on mobile players that ignore the MP4 edit list;
+- The current display title is the default filename, with Windows-invalid filename characters replaced automatically;
+- The result is written directly to the authorized asset folder when possible, with browser download as a fallback;
+- A completion dialog reports the filename and save method.
 
-开发环境必须使用 `npm run dev` 同时启动 Vite 和本地导出服务。只运行 `npm run dev:web` 时，导出 API 不可用。
+Development exports require `npm run dev`, which starts both Vite and the local export service. Running only `npm run dev:web` leaves the export API unavailable.
 
-未读取项目参数文件时，视觉参数默认使用：谱面黑色混入 `40%`、谱纸透明度 `10%`、演奏蒙版混入 `50%`。
+When no project settings file is loaded, the visual defaults are `40%` score-mask black mixing, `10%` paper transparency, and `50%` performance-mask color mixing.
 
-## 环境要求
+## Requirements
 
 - Node.js `>=20.19 <27`
 - npm
-- FFmpeg，且 `ffmpeg` 可通过系统 `PATH` 调用
-- 推荐使用最新版 Chrome 或 Edge。支持 File System Access API 时，应用可以记住素材文件夹并直接把参数写回其中；其他浏览器会退回到文件夹选择和 JSON 下载。
+- FFmpeg available as `ffmpeg` on the system `PATH`
+- A recent version of Chrome or Edge is recommended. When the File System Access API is available, MelodyRain can remember the asset folder and write settings directly into it. Other browsers fall back to folder selection and JSON downloads.
 
-## 快速开始
+## Quick Start
 
-安装依赖并启动开发服务：
+Install dependencies and start the development servers:
 
 ```powershell
 npm install
 npm run dev
 ```
 
-打开 <http://127.0.0.1:5173>。Vite 开发服务器会把 `/api` 请求代理到运行于 `127.0.0.1:4174` 的本地 Express 服务。
+Open <http://127.0.0.1:5173>. The Vite development server proxies `/api` requests to the local Express service at `127.0.0.1:4174`.
 
-在页面中点击“选择素材文件夹”，选择仓库内的：
+Click **选择素材文件夹** (Select Asset Folder) and choose this directory from the repository:
 
 ```text
 sample/ode-to-joy
 ```
 
-此样例包含：
+The sample contains:
 
 ```text
 ode-to-joy-easy-variation.mxl
@@ -76,19 +77,19 @@ ode-to-joy-easy-variation.pdf
 melody-rain.settings.json
 ```
 
-应用会使用前三个同名文件建立项目，并自动读取参数文件。PDF 仅作为原始乐谱参考，不参与程序加载。样例参数会显示纯色背景、两小节一行和彩虹色演奏元素。
+MelodyRain uses the first three files with matching base names to build the project and automatically loads the settings file. The PDF is included only as a reference and is not read by the application. The sample settings use a solid-color background, two measures per system, and rainbow-colored performance elements.
 
-素材解析和谱面排版完成、页面显示“谱面、MIDI 与音频已就绪”后，即可点击播放。
+Once parsing and layout are complete, the status changes to **Score, MIDI, and audio are ready / 谱面、MIDI 与音频已就绪**, and playback can begin.
 
-## 准备自己的素材
+## Preparing Your Own Assets
 
-一个素材文件夹至少需要：
+An asset folder must contain at least:
 
-- 一份乐谱：`.mxl`、`.musicxml` 或 `.xml`；
-- 一份 MIDI：`.mid` 或 `.midi`；
-- 一份音频：`.mp3`。
+- One score: `.mxl`, `.musicxml`, or `.xml`;
+- One MIDI file: `.mid` or `.midi`;
+- One audio file: `.mp3`.
 
-建议三者使用相同的主文件名，例如：
+Using the same base name for all three files is recommended:
 
 ```text
 my-song.mxl
@@ -96,40 +97,40 @@ my-song.mid
 my-song.mp3
 ```
 
-也可以加入 `.png`、`.jpg`、`.jpeg`、`.webp` 或 `.avif` 背景图片，以及一个 `melody-rain.settings.json` 参数文件。若三类必需素材各自只有一个候选，即使文件名不同也可以载入；存在多组且无法唯一匹配时，应用会停止并提示错误。
+You may also include `.png`, `.jpg`, `.jpeg`, `.webp`, or `.avif` background images and one `melody-rain.settings.json` file. If there is exactly one candidate for each required asset type, the files can still be loaded when their names differ. If the folder contains multiple groups that cannot be matched unambiguously, MelodyRain stops and reports an error.
 
-MusicXML、MIDI 和 MP3 应来自同一份乐谱及同一次导出，否则音符动画可能无法正确对应音频。
+The MusicXML, MIDI, and MP3 should come from the same score and export. Otherwise, note animations may not align correctly with the audio.
 
-## 参数保存与读取
+## Saving and Loading Settings
 
-控制栏中的“保存参数”会保存以下设置：
+The **保存参数** (Save Settings) action stores:
 
-- 标题、标题颜色及自动/自定义模式；
-- 每行小节数；
-- 背景模式、颜色或图片文件名；
-- 谱面蒙版黑色混入和谱纸透明度；
-- 演奏元素模式、混入颜色和混入强度。
-- 共享连杆音符模式。
-- 帧范围着色的 60 帧过渡及自定义范围。
+- Title, title color, and automatic/custom color mode;
+- Measures per system;
+- Background mode, color, or image filename;
+- Score-mask black mixing and paper transparency;
+- Performance-effect mode, mix color, and mix strength.
+- Connected-note mode;
+- Frame-range coloring with a 60-frame transition and custom ranges.
 
-“NOTE FRAME EFFECT / 音符帧效果”统一管理共享混入强度和帧范围着色。首次载入时自动建立从第 1 帧到最后一帧的 `Range 1`，可选择单色或彩虹色。单色恢复为共用谱面背景源并按混入强度叠加颜色：强度降低时回到背景图片或背景色，而不是固定趋近黑色。彩虹色不使用该强度并始终显示完整色板。范围结束或范围之间存在空档时，沿用最近一个范围的设置，直到下一个范围接管或视频结束。所有颜色边界都按绝对帧号经 60 帧平滑过渡，包括单色与彩虹色之间的模式切换（经彩虹渲染逐色插值，过渡结束才切换渲染器）。
+**NOTE FRAME EFFECT / 音符帧效果** manages one shared mix strength and frame-range coloring. On first load it creates `Range 1` from frame 1 through the final frame. Solid ranges use the shared score background source with a color overlay at the selected strength; rainbow ranges ignore strength. When a range ends or ranges have a gap, the most recent range setting continues until another range takes over or the video ends. All color boundaries interpolate smoothly over 60 frames from absolute frame numbers, including solid/rainbow mode switches, which cross-fade through the rainbow renderer before settling on the final renderer.
 
-文件名固定为 `melody-rain.settings.json`。浏览器具有素材文件夹写入权限时会直接保存到该文件夹；否则浏览器会下载文件，需要手动将它放回素材文件夹。点击“读取参数”可重新应用已发现的参数文件，或另行选择 JSON 文件。
+The filename is always `melody-rain.settings.json`. If the browser has write access to the asset folder, the file is saved there directly. Otherwise, the browser downloads it and you must move it into the asset folder manually. Use **读取参数** (Load Settings) to reapply the detected settings file or choose another JSON file.
 
-当前开发格式为 v5，只读取当前版本。完整且可编辑的默认配置可参考 `sample/ode-to-joy/melody-rain.settings.json`；其中包含可直接读取的 `noteFrameEffect` 混入强度和至少一个从第 1 帧开始的范围。
+The current development format is v5 and only the current version is accepted. `sample/ode-to-joy/melody-rain.settings.json` is the complete editable default and contains readable `noteFrameEffect` strength and at least one range starting at frame 1.
 
-应用首次启动且没有已记住的用户素材文件夹时，会自动加载 `sample/ode-to-joy`，包括乐谱、MIDI、MP3、背景图片和默认设置。用户选择并授权自己的素材文件夹后，后续刷新优先恢复用户文件夹，不再自动覆盖为示例项目。
+On first startup, when no user media folder has been remembered, MelodyRain automatically loads `sample/ode-to-joy`, including its score, MIDI, MP3, background, and default settings. Once the user selects and authorizes a media folder, later refreshes restore that folder instead of replacing it with the sample.
 
-## 生产构建
+## Production Build
 
 ```powershell
 npm run build
 npm start
 ```
 
-然后打开 <http://127.0.0.1:4174>。
+Then open <http://127.0.0.1:4174>.
 
-## 开发与验证
+## Development and Verification
 
 ```powershell
 npm run typecheck
@@ -138,22 +139,22 @@ npm run build
 npm run deps:check
 ```
 
-主要代码位于：
+Main source directories:
 
 ```text
-src/components/   页面控制、播放信息与舞台
-src/hooks/        素材文件夹加载流程
-src/lib/          乐谱、MIDI、时间轴、相机、蒙版与动画层
-src/server/       本地生产服务
+src/components/   Page controls, playback information, and stage
+src/hooks/        Asset-folder loading workflow
+src/lib/          Score, MIDI, timeline, camera, masks, and animation layers
+src/server/       Local production server
 ```
 
-更完整的产品规则和技术设计见 [MelodyRain_Product_Technical_Spec_v0.1.md](./MelodyRain_Product_Technical_Spec_v0.1.md)。
+See [MelodyRain_Product_Technical_Spec_v0.1.md](./MelodyRain_Product_Technical_Spec_v0.1.md) for the complete product rules and technical design. The specification is currently available in Chinese.
 
-## 当前边界
+## Current Limitations
 
-- 视频导出要求本机安装 Chrome 或 Edge，并确保可通过 `PATH` 调用 FFmpeg；
-- 当前导出采用逐帧浏览器截图，速度明显慢于实时播放；
-- 音频直接使用素材中的 MP3，没有接入 SoundFont/FluidSynth 合成；
-- MusicXML 与 MIDI 使用现有谱面目标进行匹配，尚未提供正式的对齐置信度报告和人工校正界面；
-- 当前仅提供 9:16 竖屏舞台，不提供横屏布局；
-- 浏览器不会读取任意本地路径，必须由用户选择并授权素材文件夹。
+- Video export requires a locally installed Chrome or Edge browser and FFmpeg available on `PATH`;
+- The current frame-by-frame browser screenshot pipeline is substantially slower than real time;
+- Audio is played directly from the supplied MP3; SoundFont/FluidSynth synthesis is not integrated;
+- MusicXML and MIDI are matched against the available score targets, but there is no formal alignment-confidence report or manual correction interface yet;
+- Only a 9:16 portrait stage is available; landscape layouts are not supported;
+- Browsers cannot read arbitrary local paths. The user must select and authorize the asset folder.
