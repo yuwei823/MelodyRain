@@ -6,9 +6,55 @@ MelodyRain is a local-first animated sheet-music application. It reads MusicXML/
 
 The current version supports portrait-format previews in the browser and local MP4 video export.
 
+## 🎬 Demo Video
+
+![Melody Rain Preview](src\assets\introduction.gif)
+
+[▶ Watch full demo on YouTube](https://youtu.be/E06tpN6sOag)
+
 ## How Codex & GPT-5.6 were used
 
-GPT-5.6, accessed through Codex, was the primary AI model used throughout the creation of Melody Rain. It helped turn the initial emotional concept into the product and technical specification, draft and maintain the README, design the architecture, generate and refactor the React, TypeScript, SCSS, Express, Playwright, and FFmpeg code, write tests, diagnose bugs, and iterate on synchronization, animation, UI, and export behavior. GPT-5.6 was used as a development collaborator across the project rather than as a model embedded in Melody Rain at runtime; the application itself does not currently call the OpenAI API while a user previews or exports a performance.
+GPT-5.6, accessed through Codex, was the primary AI model used throughout the creation of Melody Rain. It helped turn the initial emotional concept into the product and technical specification, draft and maintain the README, design the architecture, generate and refactor all React, TypeScript, SCSS, Express, Playwright, and FFmpeg code, write tests, diagnose bugs, and iterate on synchronization, animation, UI, and export behavior. GPT-5.6 was used as a development collaborator across the project rather than as a model embedded in Melody Rain at runtime; the application itself does not currently call the OpenAI API while a user previews or exports a performance.
+
+## Requirements
+
+- Node.js `>=20.19 <27`
+- npm
+- FFmpeg available as `ffmpeg` on the system `PATH`
+- A recent version of Chrome or Edge is recommended. When the File System Access API is available, MelodyRain can remember the asset folder and write settings directly into it. Other browsers fall back to folder selection and JSON downloads.
+
+## Quick Start
+
+Install dependencies and start the development servers:
+
+```powershell
+npm install
+npm run dev
+```
+
+Open <http://127.0.0.1:5173>. The Vite development server proxies `/api` requests to the local Express service at `127.0.0.1:4174`.
+
+The application should already load the sample "ode-to-joy", and you can just click "Play" to start playback. If the sample is not loaded, click **素材文件夹/ SOURCE FOLDER** and choose this directory from the repository:
+
+```text
+sample/ode-to-joy
+```
+
+![Sample loaded interface](src/assets/readme-sample-loaded.png)
+
+The sample contains:
+
+```text
+ode-to-joy-easy-variation.mxl
+ode-to-joy-easy-variation.mid
+ode-to-joy-easy-variation.mp3
+ode-to-joy-easy-variation.pdf
+melody-rain.settings.json
+```
+
+MelodyRain uses the first three files with matching base names to build the project and automatically loads the settings file. The PDF is included only as a reference and is not read by the application. The sample settings use a solid-color background, two measures per system, and rainbow-colored performance elements.
+
+Once parsing and layout are complete, the status changes to **Score, MIDI, and audio are ready / 谱面、MIDI 与音频已就绪**, and playback can begin.
 
 ## Features
 
@@ -42,46 +88,6 @@ The local Express service creates an export job. Playwright drives an installed 
 Development exports require `npm run dev`, which starts both Vite and the local export service. Running only `npm run dev:web` leaves the export API unavailable.
 
 When no project settings file is loaded, the visual defaults are `40%` score-mask black mixing, `10%` paper transparency, and `50%` performance-mask color mixing.
-
-## Requirements
-
-- Node.js `>=20.19 <27`
-- npm
-- FFmpeg available as `ffmpeg` on the system `PATH`
-- A recent version of Chrome or Edge is recommended. When the File System Access API is available, MelodyRain can remember the asset folder and write settings directly into it. Other browsers fall back to folder selection and JSON downloads.
-
-## Quick Start
-
-Install dependencies and start the development servers:
-
-```powershell
-npm install
-npm run dev
-```
-
-Open <http://127.0.0.1:5173>. The Vite development server proxies `/api` requests to the local Express service at `127.0.0.1:4174`.
-
-The application should already load the sample "ode-to-joy", and you can just click "Play" to start playback. If the sample is not loaded, click **选择素材文件夹** (Select Asset Folder) and choose this directory from the repository:
-
-```text
-sample/ode-to-joy
-```
-
-![Sample loaded interface](src/assets/readme-sample-loaded.png)
-
-The sample contains:
-
-```text
-ode-to-joy-easy-variation.mxl
-ode-to-joy-easy-variation.mid
-ode-to-joy-easy-variation.mp3
-ode-to-joy-easy-variation.pdf
-melody-rain.settings.json
-```
-
-MelodyRain uses the first three files with matching base names to build the project and automatically loads the settings file. The PDF is included only as a reference and is not read by the application. The sample settings use a solid-color background, two measures per system, and rainbow-colored performance elements.
-
-Once parsing and layout are complete, the status changes to **Score, MIDI, and audio are ready / 谱面、MIDI 与音频已就绪**, and playback can begin.
 
 ## Preparing Your Own Assets
 
