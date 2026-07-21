@@ -8,7 +8,7 @@ The current version supports portrait-format previews in the browser and local M
 
 ## 🎬 Demo Video
 
-![Melody Rain Preview](./src/assets/introduction.gif)
+![Melody Rain Preview](src/assets/introduction.gif)
 
 [▶ Watch full demo on YouTube](https://youtu.be/E06tpN6sOag)
 

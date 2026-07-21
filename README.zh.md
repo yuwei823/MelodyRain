@@ -8,7 +8,7 @@ MelodyRain 是一个本地优先的五线谱演奏动画工具。它读取 Music
 
 ## 🎬 演示视频
 
-![Melody Rain Preview](./src/assets/introduction.gif)
+![Melody Rain Preview](src/assets/introduction.gif)
 
 [▶ 在 YouTube 观看完整演示](https://youtu.be/E06tpN6sOag)
 
