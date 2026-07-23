@@ -144,4 +144,50 @@ describe("PerformanceEffectLayer mode isolation", () => {
     layer.dispose();
     style.remove();
   });
+
+  it("updates already-prepared rainbow elements when the palette changes", () => {
+    const frame = document.createElement("div");
+    const viewport = document.createElement("div");
+    Object.defineProperties(viewport, {
+      clientWidth: { configurable: true, value: 800 },
+      clientHeight: { configurable: true, value: 600 },
+    });
+    frame.getBoundingClientRect = () => bounds(800, 600);
+    viewport.getBoundingClientRect = () => bounds(800, 600);
+    viewport.append(frame);
+    document.body.append(viewport);
+
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    const note = document.createElementNS("http://www.w3.org/2000/svg", "path") as SVGGraphicsElement;
+    note.style.fill = "black";
+    note.getBoundingClientRect = () => bounds(12, 8);
+    Object.defineProperty(note, "getScreenCTM", { configurable: true, value: () => null });
+    svg.append(note);
+    frame.append(svg);
+
+    const layer = new PerformanceEffectLayer(frame, viewport);
+    layer.setVisuals({
+      maskElements: [note],
+      paints: [{ element: note, paint: { kind: "solid", color: "#F05D6C" } }],
+    });
+
+    // Switch to rainbow and finish preparation with the default palette.
+    layer.setConfig({ mode: "rainbow", mixColor: "#1CAEE8", mixAmount: 1 });
+    expect(frames.size).toBe(1);
+    const [firstId, firstCallback] = frames.entries().next().value!;
+    frames.delete(firstId);
+    firstCallback(performance.now());
+    expect(note.style.getPropertyValue("fill")).toBe("rgb(240, 93, 108)");
+
+    // A palette change must re-apply the new color instead of keeping the old one.
+    layer.setConfig({
+      mode: "rainbow",
+      mixColor: "#1CAEE8",
+      mixAmount: 1,
+      palette: { C: "#000000", D: "#111111", E: "#222222", F: "#333333", G: "#444444", A: "#555555", B: "#666666" },
+    });
+    expect(note.style.getPropertyValue("fill")).toBe("rgb(0, 0, 0)");
+
+    layer.dispose();
+  });
 });

@@ -221,8 +221,14 @@ export class PerformanceEffectLayer {
       this.applyMode();
     }
     else if (this.config.mode === "mask") this.update();
-    else if (changedPalette && this.rainbowReady) {
-      this.paints.forEach(({ element, paint }) => this.applyRainbowPaint(element, paint));
+    else if (changedPalette) {
+      // The rainbow paint signature does not include the palette, so a palette
+      // change during a transition must invalidate the cache; otherwise already
+      // prepared elements keep the old palette (often the default #1CAEE8 G).
+      this.lastAppliedRainbow.clear();
+      if (this.rainbowReady) {
+        this.paints.forEach(({ element, paint }) => this.applyRainbowPaint(element, paint));
+      }
     }
   }
 
@@ -320,6 +326,9 @@ export class PerformanceEffectLayer {
       this.scheduleRainbowPreparation();
       return;
     }
+    // Rainbow is already prepared; re-apply with the current palette so a mode
+    // switch or a palette change does not show stale colors.
+    this.paints.forEach(({ element, paint }) => this.applyRainbowPaint(element, paint));
     this.showRainbowMode();
   }
 

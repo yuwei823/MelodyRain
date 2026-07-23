@@ -36,4 +36,43 @@ describe("score-system-following vertical camera", () => {
   it("does not scroll when the score fits in the viewport", () => {
     expect(systemFollowingCameraOffset(anchors, 20, 2_000, 1_600)).toBe(0);
   });
+
+  it("uses rest height when computing the system vertical span", () => {
+    // Piano grand staff: treble note near the top, bass rest near the bottom.
+    const withRestHeight = [
+      { scoreQuarter: 0, x: 50, y: 100, height: 8 },
+      { scoreQuarter: 0, x: 50, y: 300, height: 40 },
+    ];
+    const withoutRestHeight = [
+      { scoreQuarter: 0, x: 50, y: 100, height: 8 },
+      { scoreQuarter: 0, x: 50, y: 300 },
+    ];
+    // viewport 300px, score 1000px -> must scroll.
+    expect(systemFollowingCameraOffset(withRestHeight, 0, 300, 1_000)).toBe(70);
+    // Without height the rest bottom is underestimated, so the offset is smaller.
+    expect(systemFollowingCameraOffset(withoutRestHeight, 0, 300, 1_000)).toBe(50);
+  });
+
+  it("does not split one measure into multiple rows because of rest x position", () => {
+    // A piano measure whose bass rest is horizontally far to the right of the
+    // treble notes used to make the row detector think the notes started a new
+    // row. The fix is to let callers omit rest anchors; here we verify the
+    // resulting anchors produce a single stable row.
+    const noteAnchors = [
+      { scoreQuarter: 0, x: 100, y: 100, height: 8 },
+      { scoreQuarter: 0.5, x: 120, y: 100, height: 8 },
+      { scoreQuarter: 1, x: 140, y: 100, height: 8 },
+    ];
+    const withRestAnchors = [
+      ...noteAnchors,
+      { scoreQuarter: 0, x: 300, y: 300, height: 20 },
+    ];
+    // Notes alone form one row; offset stays stable across the measure.
+    expect(systemFollowingCameraOffset(noteAnchors, 0.5, 300, 1_000))
+      .toBe(systemFollowingCameraOffset(noteAnchors, 1, 300, 1_000));
+    // With the rest included the first column shifts right, so the second
+    // column looks like a new row and produces a different (wrong) offset.
+    expect(systemFollowingCameraOffset(withRestAnchors, 0.5, 300, 1_000))
+      .not.toBe(systemFollowingCameraOffset(withRestAnchors, 1, 300, 1_000));
+  });
 });

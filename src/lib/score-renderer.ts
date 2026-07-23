@@ -58,6 +58,8 @@ export interface TimedRainSymbol {
   staffIndex: number;
   x: number;
   y: number;
+  width: number;
+  height: number;
 }
 
 export interface TimedScoreSpan {
@@ -199,6 +201,8 @@ export class ScoreRenderer {
                   staffIndex,
                   x: bounds.left - hostBounds.left + bounds.width / 2,
                   y: bounds.top - hostBounds.top + bounds.height / 2,
+                  width: bounds.width,
+                  height: bounds.height,
                 });
                 elements.forEach((element) => element.style.setProperty("visibility", "hidden"));
               }

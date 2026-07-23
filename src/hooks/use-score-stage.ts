@@ -129,19 +129,17 @@ export function useScoreStage(options: ScoreStageOptions) {
           maskLayer.setPaperTransparency(paperTransparencyPercentRef.current / 100);
           scoreMaskLayerRef.current = maskLayer;
           const camera = new ScoreCamera(viewport, contentClip, host);
-          camera.setAnchors([
-            ...targets.map((target) => ({
-              scoreQuarter: target.scoreQuarter,
-              x: target.x,
-              y: target.y,
-              height: target.height,
-            })),
-            ...restSymbols.map((rest) => ({
-              scoreQuarter: rest.scoreQuarter,
-              x: rest.x,
-              y: rest.y,
-            })),
-          ]);
+          // Rests are hidden and their horizontal center can sit far from the
+          // notes in the same measure (e.g. whole-measure rests in the bass
+          // staff of a piano part), which makes the row-detection heuristic in
+          // score-camera treat one measure as multiple rows. Only use note
+          // targets for vertical scrolling anchors.
+          camera.setAnchors(targets.map((target) => ({
+            scoreQuarter: target.scoreQuarter,
+            x: target.x,
+            y: target.y,
+            height: target.height,
+          })));
           camera.update(timeline.scoreQuarterAt(timeMs));
           scoreCameraRef.current = camera;
         }
